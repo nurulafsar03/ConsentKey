@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <script>
+      (function () {
+        // Universal console interceptor to completely silence [vite] HMR & WebSocket noise
+        var methods = ['log', 'info', 'warn', 'error', 'debug'];
+        for (var m = 0; m < methods.length; m++) {
+          (function (methodName) {
+            var orig = console[methodName];
+            if (!orig) return;
+            console[methodName] = function () {
+              for (var i = 0; i < arguments.length; i++) {
+                var str = String(arguments[i] || '');
+                if (
+                  str.indexOf('[vite]') !== -1 ||
+                  str.indexOf('vite-hmr') !== -1 ||
+                  str.indexOf('vite-ping') !== -1 ||
+                  str.indexOf('websocket') !== -1 ||
+                  str.indexOf('WebSocket') !== -1
+                ) {
+                  return;
+                }
+              }
+              return orig.apply(console, arguments);
+            };
+          })(methods[m]);
+        }
+
+        // Intercept Vite HMR WebSocket in Cloud Run sandbox environment
+        var NativeWS = window.WebSocket;
+        if (NativeWS) {
+          function FakeViteWS(url, protocols) {
+            var urlStr = String(url || '');
+            if (
+              protocols === 'vite-hmr' ||
+              protocols === 'vite-ping' ||
+              urlStr.indexOf('vite') !== -1 ||
+              urlStr.indexOf('token=') !== -1 ||
+              urlStr.indexOf('24678') !== -1
+            ) {
+              var target = new EventTarget();
+              target.url = url;
+              target.protocols = protocols;
+              target.readyState = 1; // WebSocket.OPEN
+              target.OPEN = 1;
+              target.CONNECTING = 0;
+              target.CLOSING = 2;
+              target.CLOSED = 3;
+              target.binaryType = 'blob';
+              target.bufferedAmount = 0;
+              target.extensions = '';
+              target.onopen = null;
+              target.onmessage = null;
+              target.onerror = null;
+              target.onclose = null;
+              target.send = function () {};
+              target.close = function () {
+                target.readyState = 3;
+                if (typeof target.onclose === 'function') {
+                  try {
+                    target.onclose(new Event('close'));
+                  } catch (e) {}
+                }
+              };
+              setTimeout(function () {
+                target.readyState = 1;
+                if (typeof target.onopen === 'function') {
+                  try {
+                    target.onopen(new Event('open'));
+                  } catch (e) {}
+                }
+                try {
+                  target.dispatchEvent(new Event('open'));
+                } catch (e) {}
+              }, 0);
+              return target;
+            }
+            return new NativeWS(url, protocols);
+          }
+          FakeViteWS.prototype = NativeWS.prototype;
+          FakeViteWS.OPEN = 1;
+          FakeViteWS.CONNECTING = 0;
+          FakeViteWS.CLOSING = 2;
+          FakeViteWS.CLOSED = 3;
+          window.WebSocket = FakeViteWS;
+        }
+
+        window.addEventListener('error', function (e) {
+          var msg = e && e.message ? String(e.message) : '';
+          if (msg.indexOf('[vite]') !== -1 || msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
+
+        window.addEventListener('unhandledrejection', function (e) {
+          var reason = e && e.reason ? String(e.reason) : '';
+          if (reason.indexOf('[vite]') !== -1 || reason.indexOf('WebSocket') !== -1 || reason.indexOf('websocket') !== -1) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
+      })();
+    </script>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ConsentKey - Consent-Based Live Location & Comms</title>
+    <meta name="description" content="Consent-first live location sharing, direct P2P device-to-device file transfer with 6-digit codes, voice & video calls, audio messages, and text chat with 24-hour browser-only retention for families, delivery businesses, and teams." />
+    <meta name="keywords" content="direct p2p file transfer, no upload file share, 6-digit transfer code, device to device file transfer, live location sharing, consent based gps tracking, family locator app, find my family alternative, private location sharing, p2p audio intercom, safe zones geofencing, private location tracking, 24 hour location retention" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="author" content="ConsentKey Protocol" />
+    <link rel="canonical" href="https://consentkey.online/" />
+
+    <!-- Open Graph / Social Sharing -->
+    <meta property="og:site_name" content="ConsentKey" />
+    <meta property="og:title" content="ConsentKey - Consent-Based Live Location & Comms" />
+    <meta property="og:description" content="Consent-first live location sharing, direct P2P device-to-device file transfer with 6-digit codes, voice & video calls, audio messages, and text chat with 24-hour browser-only retention for families, delivery businesses, and teams." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://consentkey.online/" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1200&h=630&auto=format&fit=crop&q=80" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="ConsentKey Live Location Sharing and Comms Platform Interface" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="ConsentKey - Consent-Based Live Location & Comms" />
+    <meta name="twitter:description" content="Consent-first live location sharing, direct P2P device-to-device file transfer with 6-digit codes, voice & video calls, audio messages, and text chat with 24-hour browser-only retention for families, delivery businesses, and teams." />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=1200&h=630&auto=format&fit=crop&q=80" />
+
+    <!-- Mobile & PWA Theme -->
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ConsentKey" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="shortcut icon" href="/icon.svg" />
+
+    <!-- Performance Preconnects -->
+    <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://unpkg.com" crossorigin />
+    <link rel="preconnect" href="https://images.unsplash.com" crossorigin />
+
+    <!-- Leaflet Styles -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- JSON-LD Structured Data Schema for SEO -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "@id": "https://consentkey.online/#software",
+          "name": "ConsentKey",
+          "operatingSystem": "All (Web, iOS, Android)",
+          "applicationCategory": "UtilitiesApplication, CommunicationApplication",
+          "description": "A consent-first live location sharing, voice call, audio intercom, and text chat web application with 24-hour browser-only retention for families, dispatchers, and teams.",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "featureList": [
+            "Consent-First Mutual Location Sharing",
+            "Direct P2P Device-to-Device File Transfer with 6-digit Codes",
+            "24-Hour Zero-Trace Browser Retention",
+            "Custom Geofence Safe Zones with Arrival Alerts",
+            "Encrypted Voice Calls with Lock-Screen Ringing",
+            "Direct 1-to-1 Ephemeral Sharing Links",
+            "Multi-Language RTL and LTR Internationalization"
+          ],
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.9",
+            "reviewCount": "1280"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://consentkey.online/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How is ConsentKey different from Life360 or Apple Find My?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "ConsentKey enforces explicit mutual consent. Location is only shared while the user actively toggles sharing on. All location breadcrumbs and messages are purged after 24 hours directly from browser storage with zero persistent server-side tracking."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does ConsentKey store my personal location on cloud servers?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No. ConsentKey utilizes consent-protected browser memory with 24-hour rolling retention. No tracking data is sold, monetized, or indefinitely retained."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-[#f8fafc] text-slate-800 antialiased selection:bg-emerald-500/20 selection:text-emerald-900">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

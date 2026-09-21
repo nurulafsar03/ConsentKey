@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <url>
+    <loc>https://consentkey.online/</loc>
+    <lastmod>2026-09-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://consentkey.online/?lang=en" />
+    <xhtml:link rel="alternate" hreflang="es" href="https://consentkey.online/?lang=es" />
+    <xhtml:link rel="alternate" hreflang="fr" href="https://consentkey.online/?lang=fr" />
+    <xhtml:link rel="alternate" hreflang="de" href="https://consentkey.online/?lang=de" />
+    <xhtml:link rel="alternate" hreflang="ar" href="https://consentkey.online/?lang=ar" />
+    <xhtml:link rel="alternate" hreflang="bn" href="https://consentkey.online/?lang=bn" />
+    <xhtml:link rel="alternate" hreflang="hi" href="https://consentkey.online/?lang=hi" />
+    <xhtml:link rel="alternate" hreflang="zh" href="https://consentkey.online/?lang=zh" />
+  </url>
+  <url>
+    <loc>https://consentkey.online/?page=about</loc>
+    <lastmod>2026-09-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://consentkey.online/?page=privacy</loc>
+    <lastmod>2026-09-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://consentkey.online/?page=faq</loc>
+    <lastmod>2026-09-20</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://consentkey.online/?page=contact</loc>
+    <lastmod>2026-09-20</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+</urlset>

@@ -1,0 +1,11 @@
+{
+  "name": "ConsentKey - Consent-Based Live Location & Comms",
+  "description": "Consent-first live location sharing, direct P2P device-to-device file transfer with 6-digit codes, voice & video calls, audio messages, and text chat with 24-hour browser-only retention for families, delivery businesses, and teams.",
+  "requestFramePermissions": [
+    "geolocation",
+    "microphone",
+    "camera",
+    "notifications"
+  ],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

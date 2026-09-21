@@ -1,0 +1,8 @@
+# robots.txt for ConsentKey
+# https://consentkey.online/
+
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://consentkey.online/sitemap.xml
