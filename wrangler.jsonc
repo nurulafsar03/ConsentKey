@@ -1,8 +1,22 @@
 {
   "name": "consentkey",
   "compatibility_date": "2026-09-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/worker/index.ts",
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "single-page-application"
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "consentkey-db",
+      "database_id": "c8cc4db8-7521-41fc-ac7f-a65127ccbfe3"
+    }
+  ],
+  "vars": {
+    "MAGIC_LINK_FROM_EMAIL": "ConsentKey <onboarding@resend.dev>"
   }
 }
