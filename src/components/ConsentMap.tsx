@@ -514,9 +514,6 @@ export const ConsentMap: React.FC<Props> = ({
             <button id="btn-route-${member.id}" class="py-1.5 px-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition cursor-pointer" title="Get Directions">
               <span>🧭</span>
             </button>
-            <button id="btn-intel-${member.id}" class="py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[11px] flex items-center justify-center gap-1 transition cursor-pointer" title="Real-Time Google Maps Intel & Safe Havens">
-              <span>📍 Intel</span>
-            </button>
           </div>
         `;
 
@@ -549,15 +546,6 @@ export const ConsentMap: React.FC<Props> = ({
             routeBtn.onclick = () => {
               marker.closePopup();
               onSelectMember?.(member);
-            };
-          }
-          const intelBtn = document.getElementById(`btn-intel-${member.id}`);
-          if (intelBtn) {
-            intelBtn.onclick = () => {
-              marker.closePopup();
-              if (member.lat && member.lng) {
-                onOpenMapsIntelligence?.({ lat: member.lat, lng: member.lng, name: member.name });
-              }
             };
           }
         });
@@ -652,31 +640,6 @@ export const ConsentMap: React.FC<Props> = ({
 
       {/* Floating Top-Right Tool Controls (Layer, Geofences, Trails, SOS, Recenter) */}
       <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
-        {/* Google Maps Intelligence Button */}
-        {onOpenMapsIntelligence && (
-          <button
-            onClick={() => {
-              const activeMember = members.find((m) => m.id === focusedMemberId && m.lat && m.lng);
-              const fallbackMember = members.find((m) => m.lat && m.lng);
-              const target = activeMember
-                ? { lat: activeMember.lat!, lng: activeMember.lng!, name: activeMember.name }
-                : fallbackMember
-                ? { lat: fallbackMember.lat!, lng: fallbackMember.lng!, name: fallbackMember.name }
-                : { lat: 37.7749, lng: -122.4194, name: 'Current View' };
-              onOpenMapsIntelligence(target);
-            }}
-            className={`p-2.5 rounded-2xl border shadow-md backdrop-blur-md transition cursor-pointer flex items-center gap-1.5 ${
-              isDark
-                ? 'bg-emerald-950/80 hover:bg-emerald-900/90 text-emerald-300 border-emerald-800/80'
-                : 'bg-emerald-50/95 hover:bg-emerald-100 text-emerald-800 border-emerald-300'
-            }`}
-            title="Real-Time Google Maps Intelligence (Hospitals, Safe Havens & Transit)"
-          >
-            <Compass className="w-4 h-4 text-emerald-500" />
-            <span className="text-xs font-bold hidden sm:inline">Maps Intel</span>
-          </button>
-        )}
-
         {/* Layer Style Selector Dropdown */}
         <div className="relative">
           <button

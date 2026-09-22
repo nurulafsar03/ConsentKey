@@ -8,7 +8,6 @@ import {
   Video,
   MessageSquare,
   Navigation,
-  Compass,
   Battery,
   Gauge,
   MapPin,
@@ -117,21 +116,6 @@ export const MemberTrackingPage: React.FC<Props> = ({
 
         {/* Quick Member Comms Action Buttons */}
         <div className="flex items-center gap-2">
-          {onOpenMapsIntelligence && member.lat && member.lng && (
-            <button
-              onClick={() => onOpenMapsIntelligence({ lat: member.lat!, lng: member.lng!, name: member.name })}
-              className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs ${
-                isDark
-                  ? 'bg-emerald-950/70 border-emerald-800 hover:bg-emerald-900/80 text-emerald-300'
-                  : 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 text-emerald-800'
-              }`}
-              title="Real-Time Google Maps Grounding around this member"
-            >
-              <Compass className="w-4 h-4 text-emerald-500" />
-              <span>Maps Intel</span>
-            </button>
-          )}
-
           <button
             onClick={() => onGetRoute(member)}
             className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-2xs ${

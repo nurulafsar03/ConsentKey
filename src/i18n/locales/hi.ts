@@ -315,7 +315,7 @@ export const hi: TranslationDict = {
   markResolved: 'हल हुआ चिह्नित करें',
   viewCloudflareSpecs: 'क्लाउडफ्लेयर विवरण देखें',
   footerTitle: 'ConsentKey • सहमति-आधारित लोकेशन प्लेटफ़ॉर्म',
-  footerSub: '8 भाषाओं में अनुवादित • 24 घंटे ब्राउज़र मेमोरी • क्लाउडफ्लेयर एज तैयार',
+  footerSub: '8 भाषाओं में अनुवादित • 24 घंटे ब्राउज़र मेमोरी',
   dockMap: 'मानचित्र',
   dockZones: 'क्षेत्र',
   dockSos: 'एसओएस',

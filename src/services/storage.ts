@@ -1,45 +1,19 @@
-import { ChatMessage, LocationBreadcrumb, DirectShareLink, SafeZone, AdCampaign, AdPlacement } from '../types';
+import {
+  ChatMessage,
+  LocationBreadcrumb,
+  DirectShareLink,
+  SafeZone,
+  AdCampaign,
+  AdPlacement,
+  Group,
+  Member,
+  UserRole,
+} from '../types';
 import { generateHtmlFrameEmbedCode } from '../utils/adGenerator';
 
 const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
 
-const DEFAULT_SAMPLE_CAMPAIGNS: AdCampaign[] = [
-  {
-    id: 'campaign_drag_demo',
-    name: 'Sample Visual Ad Frame (Draggable)',
-    enabled: true,
-    type: 'rich_media',
-    placement: 'draggable_float',
-    size: 'responsive',
-    embedCode: generateHtmlFrameEmbedCode({
-      mediaType: 'image',
-      mediaUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=700&q=80',
-      headline: 'Next-Gen Fleet & Family Location Safety',
-      body: 'Live GPS telemetry, instant geofence boundaries, and private zero-server breadcrumbs.',
-      ctaText: 'Try ConsentKey Pro',
-      ctaUrl: '#',
-      badge: 'SPONSORED',
-      themeColor: '#06b6d4',
-      bgColor: '#020617',
-      textColor: '#f8fafc',
-    }),
-    displayIntervalSeconds: 0,
-    durationSeconds: 0,
-    timingMode: 'always',
-    startDate: Date.now(),
-    durationPeriod: 'unlimited',
-    floatPosition: { x: 20, y: 110 },
-    mediaType: 'image',
-    mediaUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=700&q=80',
-    headlineText: 'Next-Gen Fleet & Family Location Safety',
-    bodyText: 'Live GPS telemetry, instant geofence boundaries, and private zero-server breadcrumbs.',
-    ctaText: 'Try ConsentKey Pro',
-    ctaUrl: '#',
-    badgeText: 'SPONSORED',
-    themeColor: '#06b6d4',
-    createdAt: Date.now(),
-  },
-];
+const DEFAULT_SAMPLE_CAMPAIGNS: AdCampaign[] = [];
 
 const KEYS = {
   MESSAGES: 'safeloc_chat_history_24h',
@@ -48,48 +22,14 @@ const KEYS = {
   SAFE_ZONES: 'safeloc_safe_zones',
   AUTH: 'safeloc_auth_state',
   ACTIVE_GROUP: 'safeloc_active_group',
+  SAVED_GROUPS: 'safeloc_saved_groups',
+  REGISTERED_USER: 'consentkey_user_profile',
+  MEMBERS: 'safeloc_real_members',
   CONSENT: 'safeloc_member_consent',
   AD_CAMPAIGNS: 'safeloc_ad_campaigns_master',
 };
 
-const DEFAULT_SAFE_ZONES: SafeZone[] = [
-  {
-    id: 'zone_home',
-    name: 'Family Base / Home',
-    category: 'home',
-    lat: 51.5074,
-    lng: -0.1278,
-    radiusMeters: 180,
-    color: '#10b981',
-    iconName: 'home',
-    notifyOnEntry: true,
-    notifyOnExit: true,
-  },
-  {
-    id: 'zone_school',
-    name: 'St. Mary Academy (School)',
-    category: 'school',
-    lat: 51.5124,
-    lng: -0.1218,
-    radiusMeters: 220,
-    color: '#3b82f6',
-    iconName: 'school',
-    notifyOnEntry: true,
-    notifyOnExit: true,
-  },
-  {
-    id: 'zone_hub',
-    name: 'Central Logistics Depot',
-    category: 'hub',
-    lat: 51.5024,
-    lng: -0.1338,
-    radiusMeters: 250,
-    color: '#f59e0b',
-    iconName: 'hub',
-    notifyOnEntry: true,
-    notifyOnExit: true,
-  },
-];
+const DEFAULT_SAFE_ZONES: SafeZone[] = [];
 
 export class StorageService {
   /**
@@ -121,60 +61,7 @@ export class StorageService {
       const raw = localStorage.getItem(KEYS.MESSAGES);
       let parsed: ChatMessage[] = raw ? JSON.parse(raw) : [];
 
-      // Seed initial welcoming/realistic messages if empty
-      if (parsed.length === 0) {
-        const now = Date.now();
-        parsed = [
-          {
-            id: 'msg_init_1',
-            groupId: 'grp_family_01',
-            senderId: 'mem_sarah',
-            senderName: 'Sarah Jenkins (Admin)',
-            senderRole: 'admin',
-            type: 'text',
-            text: 'ConsentKey session initiated. All location telemetry will auto-purge after 24h.',
-            timestamp: now - 3600000,
-            expiresAt: now + TWENTY_FOUR_HOURS_MS,
-          },
-          {
-            id: 'msg_init_2',
-            groupId: 'grp_family_01',
-            senderId: 'mem_leo',
-            senderName: 'Leo (Teen / Field Member)',
-            senderRole: 'member',
-            type: 'text',
-            text: 'Reached campus library safely. Location sharing active!',
-            timestamp: now - 2400000,
-            expiresAt: now + TWENTY_FOUR_HOURS_MS,
-          },
-          {
-            id: 'msg_init_3',
-            senderId: 'mem_leo',
-            senderName: 'Leo (Teen / Field Member)',
-            recipientId: 'mem_sarah',
-            recipientName: 'Sarah Jenkins (Admin)',
-            senderRole: 'member',
-            type: 'text',
-            text: 'Hey Sarah, battery is at 78%. Let me know when you need me to head back.',
-            timestamp: now - 1800000,
-            expiresAt: now + TWENTY_FOUR_HOURS_MS,
-          },
-          {
-            id: 'msg_init_4',
-            senderId: 'mem_david',
-            senderName: 'David (Member)',
-            recipientId: 'mem_sarah',
-            recipientName: 'Sarah Jenkins (Admin)',
-            senderRole: 'member',
-            type: 'text',
-            text: 'Dispatch package #849 is out for delivery. ETA is 15 minutes.',
-            timestamp: now - 1200000,
-            expiresAt: now + TWENTY_FOUR_HOURS_MS,
-          },
-        ];
-        localStorage.setItem(KEYS.MESSAGES, JSON.stringify(parsed));
-      }
-
+      // Strictly return real messages, no seeded dummy or sample messages
       const now = Date.now();
       const valid = parsed.filter((m) => m.expiresAt > now);
 
@@ -469,6 +356,78 @@ export class StorageService {
       const current = this.getAdCampaigns();
       const updated = current.map((c) => (c.id === id ? { ...c, placement } : c));
       this.saveAdCampaigns(updated);
+    } catch {}
+  }
+
+  /**
+   * Get registered real user profile
+   */
+  static getRegisteredUser(): { id: string; name: string; email: string; role: UserRole } | null {
+    try {
+      const raw = localStorage.getItem(KEYS.REGISTERED_USER);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Save registered real user profile
+   */
+  static saveRegisteredUser(user: { id: string; name: string; email: string; role: UserRole }): void {
+    try {
+      localStorage.setItem(KEYS.REGISTERED_USER, JSON.stringify(user));
+    } catch {}
+  }
+
+  /**
+   * Clear registered real user profile
+   */
+  static clearRegisteredUser(): void {
+    try {
+      localStorage.removeItem(KEYS.REGISTERED_USER);
+    } catch {}
+  }
+
+  /**
+   * Get saved real groups
+   */
+  static getSavedGroups(): Group[] {
+    try {
+      const raw = localStorage.getItem(KEYS.SAVED_GROUPS);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Save real groups
+   */
+  static saveGroups(groups: Group[]): void {
+    try {
+      localStorage.setItem(KEYS.SAVED_GROUPS, JSON.stringify(groups));
+    } catch {}
+  }
+
+  /**
+   * Get saved real members
+   */
+  static getSavedMembers(): Member[] {
+    try {
+      const raw = localStorage.getItem(KEYS.MEMBERS);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Save real members
+   */
+  static saveMembers(members: Member[]): void {
+    try {
+      localStorage.setItem(KEYS.MEMBERS, JSON.stringify(members));
     } catch {}
   }
 }

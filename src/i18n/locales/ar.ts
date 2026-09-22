@@ -315,7 +315,7 @@ export const ar: TranslationDict = {
   markResolved: 'تحديد كتم الحل',
   viewCloudflareSpecs: 'عرض مواصفات كلاودفلير',
   footerTitle: 'ConsentKey • منصة المواقع القائمة على الموافقة',
-  footerSub: 'مترجم إلى 8 لغات • تخزين في المتصفح لمدة 24 ساعة • جاهز لـ Cloudflare Edge',
+  footerSub: 'مترجم إلى 8 لغات • تخزين في المتصفح لمدة 24 ساعة',
   dockMap: 'الخريطة',
   dockZones: 'المناطق',
   dockSos: 'SOS',

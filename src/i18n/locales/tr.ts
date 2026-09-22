@@ -315,7 +315,7 @@ export const tr: TranslationDict = {
   markResolved: 'Çözüldü Olarak İşaretle',
   viewCloudflareSpecs: 'Cloudflare Özelliklerini Gör',
   footerTitle: 'ConsentKey • Rıza Esaslı Konum Platformu',
-  footerSub: '8 Dile Çevrildi • 24s Tarayıcı Belleği • Cloudflare Edge Hazır',
+  footerSub: '8 Dile Çevrildi • 24s Tarayıcı Belleği',
   dockMap: 'Harita',
   dockZones: 'Alanlar',
   dockSos: 'SOS',

@@ -3,7 +3,6 @@ import {
   ShieldCheck,
   Globe,
   Smartphone,
-  Cloud,
   Check,
   ChevronDown,
   Radio,
@@ -14,7 +13,6 @@ import {
   LogOut,
   UserCheck,
   HelpCircle,
-  Download,
 } from 'lucide-react';
 import { Language, SUPPORTED_LANGUAGES, TranslationDict } from '../i18n/translations';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -32,9 +30,9 @@ interface Props {
   userName?: string | null;
   onOpenMagicLink?: () => void;
   onLogout?: () => void;
+  onOpenRegistration?: () => void;
   onOpenDirectShare?: () => void;
   onOpenLockScreenTest: () => void;
-  onOpenCloudflareModal: () => void;
   onOpenJoinModal?: () => void;
   onOpenAdminPanel?: () => void;
   onOpenP2PTransfer?: (initialMode?: 'send' | 'receive') => void;
@@ -51,9 +49,9 @@ export const Header: React.FC<Props> = ({
   userName,
   onOpenMagicLink,
   onLogout,
+  onOpenRegistration,
   onOpenDirectShare,
   onOpenLockScreenTest,
-  onOpenCloudflareModal,
   onOpenJoinModal,
   onOpenAdminPanel,
   onOpenP2PTransfer,
@@ -140,19 +138,6 @@ export const Header: React.FC<Props> = ({
             <span>{t.lockAlertNav}</span>
           </button>
 
-          {/* Cloudflare Edge Badge */}
-          <button
-            onClick={onOpenCloudflareModal}
-            className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer ${
-              isDark
-                ? 'bg-amber-950/50 hover:bg-amber-900/50 border-amber-800/60 text-amber-300'
-                : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700 hover:text-amber-800'
-            }`}
-          >
-            <Cloud className="w-3.5 h-3.5 text-amber-500" />
-            <span>{t.cloudflareNav}</span>
-          </button>
-
           {/* Master Admin Panel & AdSense Engine */}
           {onOpenAdminPanel && (
             <button
@@ -168,6 +153,26 @@ export const Header: React.FC<Props> = ({
 
         {/* Right Section: Theme Switcher, Language Dropdown, PWA */}
         <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Real User Registration / Profile Button */}
+          {onOpenRegistration && (
+            <button
+              id="btn-header-register-profile"
+              onClick={onOpenRegistration}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap active:scale-98 ${
+                userEmail
+                  ? isDark
+                    ? 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'
+                    : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
+                  : isDark
+                    ? 'bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-emerald-950/40'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-emerald-200'
+              }`}
+              title={userEmail ? 'Manage Real Profile & Circles' : 'Register Real User & Circle'}
+            >
+              <UserCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>{userEmail ? 'My Circle' : 'Register'}</span>
+            </button>
+          )}
           {/* Admin Login Button / Logged In Admin Profile Status (Visible on ALL device views) */}
           {!userEmail ? (
             <button
@@ -215,22 +220,6 @@ export const Header: React.FC<Props> = ({
               )}
             </div>
           )}
-
-          {/* EXPORT / DOWNLOAD SOURCE ZIP BUTTON */}
-          <a
-            id="btn-header-download-zip"
-            href="/api/download-zip"
-            download="consentkey-source.zip"
-            className={`flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shadow-2xs ${
-              isDark
-                ? 'bg-emerald-950/70 hover:bg-emerald-900/90 border-emerald-700/60 text-emerald-300 hover:text-emerald-200'
-                : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-800 hover:text-emerald-900'
-            }`}
-            title="Download full project source code as a ZIP file"
-          >
-            <Download className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-            <span className="hidden sm:inline font-bold">Download ZIP</span>
-          </a>
 
           {/* THEME TOGGLE: Compact icon on mobile, with label on md+ */}
           <button

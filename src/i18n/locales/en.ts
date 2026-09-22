@@ -313,7 +313,7 @@ export const en: TranslationDict = {
   markResolved: 'Mark Resolved',
   viewCloudflareSpecs: 'View Cloudflare Deployment Specs',
   footerTitle: 'ConsentKey • Consent-Based Location Platform',
-  footerSub: 'Translated into 8 Languages • 24h Browser Memory • Cloudflare Edge Ready',
+  footerSub: 'Translated into 8 Languages • 24h Browser Memory',
   dockMap: 'Map',
   dockZones: 'Zones',
   dockSos: 'SOS',

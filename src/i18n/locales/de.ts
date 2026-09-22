@@ -315,7 +315,7 @@ export const de: TranslationDict = {
   markResolved: 'Als gelöst markieren',
   viewCloudflareSpecs: 'Cloudflare-Bereitstellungsdetails ansehen',
   footerTitle: 'ConsentKey • Einwilligungsbasierte Standortplattform',
-  footerSub: 'In 8 Sprachen übersetzt • 24h Browserspeicher • Cloudflare Edge bereit',
+  footerSub: 'In 8 Sprachen übersetzt • 24h Browserspeicher',
   dockMap: 'Karte',
   dockZones: 'Zonen',
   dockSos: 'SOS',

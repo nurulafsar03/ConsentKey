@@ -315,7 +315,7 @@ export const ur: TranslationDict = {
   markResolved: 'حل شدہ نشان زد کریں',
   viewCloudflareSpecs: 'کلاؤڈ فلیئر اسپیکس دیکھیں',
   footerTitle: 'ConsentKey • رضامندی پر مبنی لوکیشن پلیٹ فارم',
-  footerSub: '8 زبانوں میں ترجمہ شدہ • 24 گھنٹے براؤزر میموری • کلاؤڈ فلیئر ایج تیار',
+  footerSub: '8 زبانوں میں ترجمہ شدہ • 24 گھنٹے براؤزر میموری',
   dockMap: 'نقشہ',
   dockZones: 'زونز',
   dockSos: 'ایس او ایس',

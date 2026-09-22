@@ -12,24 +12,19 @@ import {
   ChevronDown,
   HelpCircle,
   Flame,
-  Cloud,
-  ChevronRight,
   ShieldCheck,
   Zap,
-  Download,
 } from 'lucide-react';
 import { TranslationDict } from '../i18n/translations';
 import { useTheme } from '../context/ThemeContext';
 
 interface Props {
   t: TranslationDict;
-  onOpenCloudflareModal: () => void;
   onOpenInfoModal?: (tab?: 'about' | 'privacy' | 'contact' | 'faq') => void;
 }
 
 export const BottomShowcaseSection: React.FC<Props> = ({
   t,
-  onOpenCloudflareModal,
   onOpenInfoModal,
 }) => {
   const { isDark } = useTheme();
@@ -124,52 +119,7 @@ export const BottomShowcaseSection: React.FC<Props> = ({
       </div>
 
       <div className={`max-w-5xl mx-auto space-y-16 ${isMobileExpanded ? 'block' : 'hidden lg:block'}`}>
-        {/* 1. Cloudflare Edge Hosting Summary Box */}
-        <div className={`p-6 sm:p-7 rounded-3xl border shadow-sm flex flex-col md:flex-row items-center justify-between gap-5 transition ${
-          isDark
-            ? 'bg-slate-900 border-amber-900/50'
-            : 'bg-gradient-to-r from-amber-50/80 via-white to-amber-50/50 border-amber-200 shadow-amber-100/40'
-        }`}>
-          <div className="flex items-center gap-4">
-            <div className={`p-3.5 rounded-2xl border shadow-2xs ${
-              isDark
-                ? 'bg-amber-950/60 border-amber-800 text-amber-400'
-                : 'bg-amber-100 border-amber-300 text-amber-700'
-            }`}>
-              <Cloud className="w-7 h-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className={`font-bold text-sm sm:text-base ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {t.cloudflareHostingTitle}
-                </h3>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold ${
-                  isDark
-                    ? 'bg-amber-950/80 text-amber-300 border border-amber-800'
-                    : 'bg-amber-200/90 text-amber-900 border border-amber-300'
-                }`}>
-                  Free Tier Ready
-                </span>
-              </div>
-              <p className={`text-xs sm:text-sm mt-1 max-w-xl ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                {t.cloudflareHostingDesc}
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onOpenCloudflareModal}
-            className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-2xs flex-shrink-0 ${
-              isDark
-                ? 'bg-amber-950/50 hover:bg-amber-900/50 border-amber-800/80 text-amber-300'
-                : 'bg-amber-100 hover:bg-amber-200/90 border-amber-300 text-amber-900'
-            }`}
-          >
-            <span>{t.viewCloudflareSpecs}</span>
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* 2. Four Core Trust Pillars */}
+        {/* Core Trust Pillars */}
         <div>
           <div className="text-center max-w-xl mx-auto mb-8">
             <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2">

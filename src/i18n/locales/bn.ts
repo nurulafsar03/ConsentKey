@@ -315,7 +315,7 @@ export const bn: TranslationDict = {
   markResolved: 'সমাধান হয়েছে চিহ্নিত করুন',
   viewCloudflareSpecs: 'ক্লাউডফ্লেয়ার স্পেক্স দেখুন',
   footerTitle: 'ConsentKey • সম্মতি-ভিত্তিক লোকেশন প্ল্যাটফর্ম',
-  footerSub: '৮টি ভাষায় অনূদিত • ২৪ ঘণ্টা ব্রাউজার মেমোরি • ক্লাউডফ্লেয়ার এজ প্রস্তুত',
+  footerSub: '৮টি ভাষায় অনূদিত • ২৪ ঘণ্টা ব্রাউজার মেমোরি',
   dockMap: 'ম্যাপ',
   dockZones: 'অঞ্চল',
   dockSos: 'এসওএস',

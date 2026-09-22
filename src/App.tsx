@@ -42,11 +42,9 @@ import { GroupJoinModal } from './components/GroupJoinModal';
 import { DirectShareModal } from './components/DirectShareModal';
 import { P2PTransferModal } from './components/P2PTransferModal';
 import { InfoModal, InfoModalTab } from './components/InfoModal';
-import { GoogleMapsIntelligenceModal } from './components/GoogleMapsIntelligenceModal';
 import { VoiceCallModal } from './components/VoiceCallModal';
 import { LockScreenAlertModal } from './components/LockScreenAlertModal';
 import { MagicLinkModal } from './components/MagicLinkModal';
-import { CloudflareModal } from './components/CloudflareModal';
 import { SafeZonesModal } from './components/SafeZonesModal';
 import { SosAlertModal } from './components/SosAlertModal';
 import { DirectChatModal } from './components/DirectChatModal';
@@ -58,6 +56,7 @@ import { GroupFolderDropdown } from './components/GroupFolderDropdown';
 import { MemberPortalView } from './components/MemberPortalView';
 import { AdSlot } from './components/AdSlot';
 import { AdminPanelModal } from './components/AdminPanelModal';
+import { UserRegistrationModal } from './components/UserRegistrationModal';
 import { StorageService } from './services/storage';
 import { audioService } from './services/audio';
 import { calculateDistanceKm, estimateTravelTimeMinutes, isInsideGeofence } from './utils/geo';
@@ -89,227 +88,80 @@ export default function App() {
     document.documentElement.lang = language;
   }, [language]);
 
-  // User Auth & Role State
-  const [currentRole, setCurrentRole] = useState<UserRole>('admin');
-  const [userEmail, setUserEmail] = useState<string | null>('admin@family.org');
-  const [userName, setUserName] = useState<string | null>('Sarah Jenkins (Admin)');
+  // Registered Real User State
+  const [registeredUser, setRegisteredUser] = useState<{ id: string; name: string; email: string; role: UserRole } | null>(
+    () => StorageService.getRegisteredUser()
+  );
+  const [currentRole, setCurrentRole] = useState<UserRole>(() => registeredUser?.role || 'admin');
+  const [userEmail, setUserEmail] = useState<string | null>(() => registeredUser?.email || null);
+  const [userName, setUserName] = useState<string | null>(() => registeredUser?.name || null);
 
-  // Groups / Circles State (Isolated environments so family, business, friends don't mix)
-  const [groups, setGroups] = useState<Group[]>([
-    {
-      id: 'grp_family_01',
-      name: 'SafeFamily Circle',
+  // Groups / Circles State (Real groups created or joined by real users)
+  const [groups, setGroups] = useState<Group[]>(() => {
+    const saved = StorageService.getSavedGroups();
+    if (saved.length > 0) return saved;
+    const initialGroup: Group = {
+      id: 'grp_initial_01',
+      name: registeredUser ? `${registeredUser.name}'s Circle` : 'My Real Circle',
       category: 'family',
-      adminId: 'usr_sarah',
-      adminName: 'Sarah Jenkins',
-      adminEmail: 'admin@family.org',
-      inviteCode: 'SAFE-8492',
-      createdAt: Date.now() - 86400000,
-    },
-    {
-      id: 'grp_business_01',
-      name: 'Apex London Office & Field',
-      category: 'business',
-      adminId: 'usr_sarah',
-      adminName: 'Sarah Jenkins',
-      adminEmail: 'admin@family.org',
-      inviteCode: 'CORP-5520',
-      createdAt: Date.now() - 43200000,
-    },
-    {
-      id: 'grp_delivery_01',
-      name: 'Speedy Delivery Fleet',
-      category: 'delivery',
-      adminId: 'usr_marcus',
-      adminName: 'Marcus Dispatcher',
-      adminEmail: 'dispatch@speedydelivery.com',
-      inviteCode: 'FLEET-7731',
-      createdAt: Date.now() - 21600000,
-    },
-    {
-      id: 'grp_friends_01',
-      name: 'Weekend Trip & Friends',
-      category: 'friends',
-      adminId: 'usr_sarah',
-      adminName: 'Sarah Jenkins',
-      adminEmail: 'admin@family.org',
-      inviteCode: 'TRIP-3391',
-      createdAt: Date.now() - 10800000,
-    },
-  ]);
-
-  // Active Group State
-  const [currentGroup, setCurrentGroup] = useState<Group>({
-    id: 'grp_family_01',
-    name: 'SafeFamily Circle',
-    category: 'family',
-    adminId: 'usr_sarah',
-    adminName: 'Sarah Jenkins',
-    adminEmail: 'admin@family.org',
-    inviteCode: 'SAFE-8492',
-    createdAt: Date.now() - 3600000,
+      adminId: registeredUser?.id || 'usr_admin',
+      adminName: registeredUser?.name || 'Circle Organizer',
+      adminEmail: registeredUser?.email || 'user@domain.com',
+      inviteCode: 'SAFE-1001',
+      createdAt: Date.now(),
+    };
+    return [initialGroup];
   });
 
-  // Group Members (Organized into separate groups with realistic coordinates)
-  const [members, setMembers] = useState<Member[]>([
-    // Family Group Members
-    {
-      id: 'mem_sarah',
-      name: 'Sarah Jenkins',
-      email: 'admin@family.org',
-      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-      role: 'admin',
-      groupId: 'grp_family_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 7200000,
-      lat: 51.5074,
-      lng: -0.1278,
-      speed: 0,
-      battery: 94,
-      accuracy: 12,
-      isOnline: true,
-    },
-    {
-      id: 'mem_leo',
-      name: 'Leo (Child / School)',
-      email: 'leo@family.org',
-      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-      role: 'member',
-      groupId: 'grp_family_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 3600000,
-      lat: 51.5135,
-      lng: -0.1365,
-      speed: 4,
-      battery: 78,
-      accuracy: 14,
-      isOnline: true,
-    },
-    {
-      id: 'mem_emma',
-      name: 'Emma (Elderly Parent)',
-      email: 'emma@family.org',
-      avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-      role: 'member',
-      groupId: 'grp_family_01',
-      isConsentGiven: true,
-      isSharingLocation: false, // Paused by member herself
-      lastConsentTimestamp: Date.now() - 5400000,
-      lat: 51.5201,
-      lng: -0.1198,
-      speed: 0,
-      battery: 88,
-      accuracy: 25,
-      isOnline: true,
-    },
-    // Business Group Members
-    {
-      id: 'mem_elena_biz',
-      name: 'Elena Rostova (Account Exec)',
-      email: 'elena@apex.co.uk',
-      avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-      role: 'admin',
-      groupId: 'grp_business_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 4100000,
-      lat: 51.5155,
-      lng: -0.0922,
-      speed: 0,
-      battery: 82,
-      accuracy: 10,
-      isOnline: true,
-    },
-    {
-      id: 'mem_james_biz',
-      name: 'James Wright (Field Tech)',
-      email: 'j.wright@apex.co.uk',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-      role: 'member',
-      groupId: 'grp_business_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 2900000,
-      lat: 51.5220,
-      lng: -0.0880,
-      speed: 18,
-      battery: 67,
-      accuracy: 15,
-      isOnline: true,
-    },
-    // Delivery Fleet Members
-    {
-      id: 'mem_david',
-      name: 'David (Member)',
-      email: 'david@delivery.org',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      role: 'member',
-      groupId: 'grp_delivery_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 1800000,
-      lat: 51.5014,
-      lng: -0.1419,
-      speed: 28,
-      battery: 63,
-      accuracy: 18,
-      isOnline: true,
-    },
-    {
-      id: 'mem_marcus_driver',
-      name: 'Marcus K. (Express Van #4)',
-      email: 'marcus@delivery.org',
-      avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-      role: 'member',
-      groupId: 'grp_delivery_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 950000,
-      lat: 51.4925,
-      lng: -0.1220,
-      speed: 34,
-      battery: 58,
-      accuracy: 12,
-      isOnline: true,
-    },
-    // Friends Group Members
-    {
-      id: 'mem_maya_friend',
-      name: 'Maya Lin',
-      email: 'maya@friends.org',
-      avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-      role: 'member',
-      groupId: 'grp_friends_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 1200000,
-      lat: 51.5170,
-      lng: -0.1550,
-      speed: 3,
-      battery: 91,
-      accuracy: 11,
-      isOnline: true,
-    },
-    {
-      id: 'mem_sam_friend',
-      name: 'Sam Brooks',
-      email: 'sam@friends.org',
-      avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
-      role: 'member',
-      groupId: 'grp_friends_01',
-      isConsentGiven: true,
-      isSharingLocation: true,
-      lastConsentTimestamp: Date.now() - 2500000,
-      lat: 51.5280,
-      lng: -0.1400,
-      speed: 0,
-      battery: 74,
-      accuracy: 16,
-      isOnline: true,
-    },
-  ]);
+  // Active Group State
+  const [currentGroup, setCurrentGroup] = useState<Group>(() => {
+    const saved = StorageService.getSavedGroups();
+    return saved.length > 0
+      ? saved[0]
+      : {
+          id: 'grp_initial_01',
+          name: registeredUser ? `${registeredUser.name}'s Circle` : 'My Real Circle',
+          category: 'family',
+          adminId: registeredUser?.id || 'usr_admin',
+          adminName: registeredUser?.name || 'Circle Organizer',
+          adminEmail: registeredUser?.email || 'user@domain.com',
+          inviteCode: 'SAFE-1001',
+          createdAt: Date.now(),
+        };
+  });
+
+  // Real Members (Strictly real users and members)
+  const [members, setMembers] = useState<Member[]>(() => {
+    const saved = StorageService.getSavedMembers();
+    if (saved.length > 0) return saved;
+    if (registeredUser) {
+      return [
+        {
+          id: `mem_${registeredUser.id}`,
+          name: registeredUser.name,
+          email: registeredUser.email,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(registeredUser.name)}&backgroundColor=0284c7,0d9488,059669`,
+          role: registeredUser.role,
+          groupId: 'grp_initial_01',
+          isConsentGiven: true,
+          isSharingLocation: true,
+          lastConsentTimestamp: Date.now(),
+          lat: 51.5074,
+          lng: -0.1278,
+          speed: 0,
+          battery: 95,
+          accuracy: 10,
+          isOnline: true,
+        },
+      ];
+    }
+    return [];
+  });
+
+  // Registration Modal State (Opens if no registered real profile is detected)
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState<boolean>(
+    () => !StorageService.getRegisteredUser()
+  );
 
   // Separate Member Tracking Page View State
   const [selectedMemberForTracking, setSelectedMemberForTracking] = useState<Member | null>(null);
@@ -318,17 +170,33 @@ export default function App() {
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
   const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
 
-  // Current active member ID (for member mobile perspective)
-  const currentMemberId = currentRole === 'admin' ? 'mem_sarah' : 'mem_leo';
+  // Current active member ID (scoped to the registered user or first member)
+  const currentMemberId = registeredUser ? `mem_${registeredUser.id}` : (members[0]?.id || 'mem_current');
 
   // Strictly filter members for the active group (No mixing between family, business, friends, etc.)
   const currentGroupMembers = members.filter((m) => m.groupId === currentGroup.id);
 
   // Active member for mobile perspective scoped to group
-  const currentMember =
+  const currentMember: Member =
     members.find((m) => m.id === currentMemberId && m.groupId === currentGroup.id) ||
     currentGroupMembers[0] ||
-    members[0];
+    members[0] || {
+      id: currentMemberId,
+      name: userName || 'Registered User',
+      email: userEmail || 'user@domain.com',
+      avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userName || 'User')}&backgroundColor=0284c7`,
+      role: currentRole,
+      groupId: currentGroup.id,
+      isConsentGiven: true,
+      isSharingLocation: true,
+      lastConsentTimestamp: Date.now(),
+      lat: 51.5074,
+      lng: -0.1278,
+      speed: 0,
+      battery: 95,
+      accuracy: 10,
+      isOnline: true,
+    };
 
   // Calculate member count per group for badge counters
   const memberCountsByGroupId = groups.reduce((acc, g) => {
@@ -364,34 +232,9 @@ export default function App() {
   const [p2pInitialCode, setP2pInitialCode] = useState<string>('');
   const [isLockScreenTestOpen, setIsLockScreenTestOpen] = useState(false);
   const [isMagicLinkModalOpen, setIsMagicLinkModalOpen] = useState(false);
-  const [isCloudflareModalOpen, setIsCloudflareModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [infoModalTab, setInfoModalTab] = useState<InfoModalTab>('about');
   const [chatRecipient, setChatRecipient] = useState<Member | null>(null);
-
-  // Real-Time Google Maps Intelligence (Grounding via Gemini 3.5 Flash)
-  const [isMapsIntelOpen, setIsMapsIntelOpen] = useState(false);
-  const [mapsIntelTarget, setMapsIntelTarget] = useState<{
-    lat: number;
-    lng: number;
-    name?: string;
-  }>({
-    lat: 37.7749,
-    lng: -122.4194,
-    name: 'Current Live GPS Location',
-  });
-
-  const handleOpenMapsIntel = (target?: { lat: number; lng: number; name?: string }) => {
-    if (target) {
-      setMapsIntelTarget(target);
-    } else {
-      const fallback = currentGroupMembers.find((m) => m.lat && m.lng);
-      if (fallback && fallback.lat && fallback.lng) {
-        setMapsIntelTarget({ lat: fallback.lat, lng: fallback.lng, name: fallback.name });
-      }
-    }
-    setIsMapsIntelOpen(true);
-  };
 
   const handleOpenInfoModal = (tab: InfoModalTab = 'about') => {
     setInfoModalTab(tab);
@@ -699,10 +542,122 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    StorageService.clearRegisteredUser();
+    setRegisteredUser(null);
     setUserEmail(null);
     setUserName(null);
     setCurrentRole('member');
+    setIsRegistrationModalOpen(true);
   };
+
+  const handleUserRegistered = (
+    user: { id: string; name: string; email: string; role: UserRole },
+    group: Group,
+    member: Member
+  ) => {
+    setRegisteredUser(user);
+    setUserName(user.name);
+    setUserEmail(user.email);
+    setCurrentRole(user.role);
+    setGroups((prev) => {
+      const exists = prev.some((g) => g.id === group.id);
+      const next = exists ? prev : [...prev, group];
+      StorageService.saveGroups(next);
+      return next;
+    });
+    setCurrentGroup(group);
+    setMembers((prev) => {
+      const exists = prev.some((m) => m.id === member.id);
+      const next = exists ? prev.map((m) => (m.id === member.id ? member : m)) : [...prev, member];
+      StorageService.saveMembers(next);
+      return next;
+    });
+    setIsRegistrationModalOpen(false);
+  };
+
+  // Real GPS Geolocation tracking & Server Telemetry Broadcast
+  useEffect(() => {
+    if (!navigator.geolocation || !currentMember?.isSharingLocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { latitude, longitude, speed, accuracy } = pos.coords;
+        handleUpdateCoords(latitude, longitude);
+
+        setMembers((prev) =>
+          prev.map((m) =>
+            m.id === currentMemberId
+              ? {
+                  ...m,
+                  lat: latitude,
+                  lng: longitude,
+                  speed: speed ? Math.round(speed * 3.6) : 0,
+                  accuracy: Math.round(accuracy),
+                  lastLocationUpdate: Date.now(),
+                }
+              : m
+          )
+        );
+
+        if (currentGroup.id) {
+          fetch(`/api/groups/${currentGroup.id}/location`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              memberId: currentMemberId,
+              lat: latitude,
+              lng: longitude,
+              speed: speed ? Math.round(speed * 3.6) : 0,
+              accuracy: Math.round(accuracy),
+              isSharingLocation: true,
+            }),
+          }).catch(() => {});
+        }
+      },
+      (err) => {
+        console.warn('Real GPS access note:', err.message);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [currentMember?.isSharingLocation, currentMemberId, currentGroup.id]);
+
+  // Periodic Polling for Real Live Group Members (Multi-device Sync)
+  useEffect(() => {
+    if (!currentGroup.id) return;
+    const pollMembers = async () => {
+      try {
+        const res = await fetch(`/api/groups/${currentGroup.id}/members`);
+        if (res.ok) {
+          const remote: Member[] = await res.json();
+          if (Array.isArray(remote) && remote.length > 0) {
+            setMembers((prev) => {
+              const updated = [...prev];
+              remote.forEach((rm) => {
+                const idx = updated.findIndex((m) => m.id === rm.id);
+                if (idx >= 0) {
+                  if (rm.id !== currentMemberId) {
+                    updated[idx] = { ...updated[idx], ...rm };
+                  }
+                } else {
+                  updated.push(rm);
+                }
+              });
+              StorageService.saveMembers(updated);
+              return updated;
+            });
+          }
+        }
+      } catch {}
+    };
+
+    pollMembers();
+    const interval = setInterval(pollMembers, 8000);
+    return () => clearInterval(interval);
+  }, [currentGroup.id, currentMemberId]);
 
   const scrollToWorkspace = () => {
     workspaceRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -722,13 +677,13 @@ export default function App() {
         userName={userName}
         onOpenMagicLink={() => setIsMagicLinkModalOpen(true)}
         onLogout={handleLogout}
+        onOpenRegistration={() => setIsRegistrationModalOpen(true)}
         onOpenDirectShare={() => setIsDirectShareOpen(true)}
         onOpenP2PTransfer={(mode) => {
           setP2pInitialMode(mode || 'send');
           setIsP2PTransferOpen(true);
         }}
         onOpenLockScreenTest={() => setIsLockScreenTestOpen(true)}
-        onOpenCloudflareModal={() => setIsCloudflareModalOpen(true)}
         onOpenJoinModal={() => {
           setJoinModalInitialMode(currentRole === 'admin' ? 'invite' : 'join');
           setIsJoinModalOpen(true);
@@ -767,7 +722,6 @@ export default function App() {
             onClearRoute={() => setActiveRoute(null)}
             onManageSafeZones={() => setIsSafeZonesModalOpen(true)}
             onTriggerSos={() => setIsSosModalOpen(true)}
-            onOpenMapsIntelligence={handleOpenMapsIntel}
           />
         </main>
       ) : (
@@ -896,7 +850,6 @@ export default function App() {
                         onClearRoute={() => setActiveRoute(null)}
                         onTriggerSos={() => setIsSosModalOpen(true)}
                         onManageSafeZones={() => setIsSafeZonesModalOpen(true)}
-                        onOpenMapsIntelligence={handleOpenMapsIntel}
                       />
                     </div>
 
@@ -937,7 +890,6 @@ export default function App() {
                         setSelectedMemberForTracking(m);
                         handleGetRoute(m);
                       }}
-                      onOpenMapsIntelligence={handleOpenMapsIntel}
                       t={t}
                     />
 
@@ -1002,7 +954,6 @@ export default function App() {
               ========================================================================= */}
           <BottomShowcaseSection
             t={t}
-            onOpenCloudflareModal={() => setIsCloudflareModalOpen(true)}
             onOpenInfoModal={handleOpenInfoModal}
           />
         </>
@@ -1110,12 +1061,6 @@ export default function App() {
         t={t}
       />
 
-      <CloudflareModal
-        isOpen={isCloudflareModalOpen}
-        onClose={() => setIsCloudflareModalOpen(false)}
-        t={t}
-      />
-
       <SafeZonesModal
         isOpen={isSafeZonesModalOpen}
         onClose={() => setIsSafeZonesModalOpen(false)}
@@ -1192,12 +1137,12 @@ export default function App() {
         initialTab={infoModalTab}
       />
 
-      {/* Real-Time Google Maps Intelligence Grounding Modal */}
-      <GoogleMapsIntelligenceModal
-        isOpen={isMapsIntelOpen}
-        onClose={() => setIsMapsIntelOpen(false)}
-        theme={theme}
-        targetLocation={mapsIntelTarget}
+      {/* Real User Registration & Circle Creation / Join Modal */}
+      <UserRegistrationModal
+        isOpen={isRegistrationModalOpen}
+        onClose={() => setIsRegistrationModalOpen(false)}
+        onRegistered={handleUserRegistered}
+        isInitialRequired={!registeredUser}
       />
 
       {/* Floating Bottom Bar Ad Slot */}

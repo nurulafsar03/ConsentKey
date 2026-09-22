@@ -186,6 +186,135 @@ async function startServer() {
     res.json({ status: 'ok', mapsGroundingEnabled: true });
   });
 
+  // Real User Registration & Group Creation/Join
+  app.post('/api/register', async (req, res) => {
+    try {
+      const { realDataStore } = await import('./server/realDataStore');
+      const { name, email, role, groupAction, groupName, groupCategory, inviteCode } = req.body || {};
+      if (!name || !email) {
+        return res.status(400).json({ error: 'Name and email are required for real registration' });
+      }
+      const result = realDataStore.registerUser({
+        name,
+        email,
+        role: role === 'admin' ? 'admin' : 'member',
+        groupAction: groupAction === 'join' ? 'join' : 'create',
+        groupName,
+        groupCategory,
+        inviteCode,
+      });
+      res.json(result);
+    } catch (err: any) {
+      console.error('Registration failed:', err);
+      res.status(500).json({ error: err?.message || 'Failed to complete registration' });
+    }
+  });
+
+  // Get all active real groups
+  app.get('/api/groups', async (_req, res) => {
+    try {
+      const { realDataStore } = await import('./server/realDataStore');
+      res.json(realDataStore.getAllGroups());
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // Join a real group with invite code
+  app.post('/api/groups/join', async (req, res) => {
+    try {
+      const { realDataStore } = await import('./server/realDataStore');
+      const { inviteCode, user } = req.body || {};
+      if (!inviteCode || !user) {
+        return res.status(400).json({ error: 'inviteCode and user profile are required' });
+      }
+      const group = realDataStore.getGroupByInviteCode(inviteCode);
+      if (!group) {
+        return res.status(404).json({ error: 'Group with this invite code not found' });
+      }
+      const registered = realDataStore.registerUser({
+        name: user.name,
+        email: user.email,
+        role: 'member',
+        groupAction: 'join',
+        inviteCode,
+      });
+      res.json(registered);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // Get real members for a group with real live coordinates
+  app.get('/api/groups/:id/members', async (req, res) => {
+    try {
+      const { realDataStore } = await import('./server/realDataStore');
+      const members = realDataStore.getGroupMembers(req.params.id);
+      res.json(members);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // Update member real live location telemetry
+  app.post('/api/groups/:id/location', async (req, res) => {
+    try {
+      const { realDataStore } = await import('./server/realDataStore');
+      const { memberId, lat, lng, speed, battery, accuracy, isSharingLocation } = req.body || {};
+      if (!memberId || typeof lat !== 'number' || typeof lng !== 'number') {
+        return res.status(400).json({ error: 'memberId, lat, and lng are required' });
+      }
+      const updated = realDataStore.updateMemberLocation(memberId, {
+        lat,
+        lng,
+        speed,
+        battery,
+        accuracy,
+        isSharingLocation,
+      });
+      if (!updated) {
+        return res.status(404).json({ error: 'Member not found' });
+      }
+      res.json(updated);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // Get real group messages (24h retention)
+  app.get('/api/groups/:id/messages', async (req, res) => {
+    try {
+      const { realDataStore } = await import('./server/realDataStore');
+      const messages = realDataStore.getMessages(req.params.id);
+      res.json(messages);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
+  // Send a real message
+  app.post('/api/groups/:id/messages', async (req, res) => {
+    try {
+      const { realDataStore } = await import('./server/realDataStore');
+      const { senderId, senderName, senderRole, type, text, audioBlobUrl, audioDurationSeconds } = req.body || {};
+      if (!senderId || !senderName) {
+        return res.status(400).json({ error: 'senderId and senderName are required' });
+      }
+      const message = realDataStore.addMessage(req.params.id, {
+        senderId,
+        senderName,
+        senderRole: senderRole || 'member',
+        type: type || 'text',
+        text,
+        audioBlobUrl,
+        audioDurationSeconds,
+      });
+      res.json(message);
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message });
+    }
+  });
+
   // Direct source code ZIP export endpoint
   app.get('/api/download-zip', (_req, res) => {
     import('child_process').then(({ execFile }) => {

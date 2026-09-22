@@ -315,7 +315,7 @@ export const fa: TranslationDict = {
   markResolved: 'علامت‌گذاری به عنوان حل‌شده',
   viewCloudflareSpecs: 'مشاهده مشخصات کلودفلر',
   footerTitle: 'ConsentKey • پلتفرم موقعیت‌یابی مبتنی بر رضایت',
-  footerSub: 'ترجمه‌شده به ۸ زبان • حافظه ۲۴ ساعته مرورگر • آماده برای کلودفلر اج',
+  footerSub: 'ترجمه‌شده به ۸ زبان • حافظه ۲۴ ساعته مرورگر',
   dockMap: 'نقشه',
   dockZones: 'مناطق',
   dockSos: 'SOS',
