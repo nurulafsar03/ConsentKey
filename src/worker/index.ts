@@ -265,12 +265,20 @@ app.post('/api/admin/request-login', async (c) => {
     const attempt = (body?.email || '').trim().toLowerCase();
     const superEmail = (c.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
 
+    // TEMP DIAGNOSTIC LOGGING — safe to leave in (never reveals the email to
+    // the caller, only to `wrangler tail`), but remove once login works.
+    console.log('[admin-login] attempt email:', attempt);
+    console.log('[admin-login] SUPER_ADMIN_EMAIL configured:', superEmail ? `"${superEmail}"` : '(empty/unset)');
+    console.log('[admin-login] emails match:', attempt === superEmail);
+    console.log('[admin-login] RESEND_API_KEY present:', !!c.env.RESEND_API_KEY);
+
     if (superEmail && attempt === superEmail && c.env.RESEND_API_KEY) {
       const token = await createMagicLink(c.env.DB, 'super_admin', superEmail);
       const siteUrl = c.env.PUBLIC_SITE_URL || new URL(c.req.url).origin;
       const verifyLink = `${siteUrl}/api/admin/verify?token=${token}`;
+      console.log('[admin-login] sending via Resend, from:', c.env.MAGIC_LINK_FROM_EMAIL || 'ConsentKey <onboarding@resend.dev>');
       try {
-        await sendMagicLinkEmail({
+        const emailResult = await sendMagicLinkEmail({
           apiKey: c.env.RESEND_API_KEY,
           fromEmail: c.env.MAGIC_LINK_FROM_EMAIL || 'ConsentKey <onboarding@resend.dev>',
           toEmail: superEmail,
@@ -278,9 +286,12 @@ app.post('/api/admin/request-login', async (c) => {
           magicLink: verifyLink,
           circleName: 'Super Admin Panel',
         });
+        console.log('[admin-login] Resend result:', JSON.stringify(emailResult));
       } catch (err: any) {
-        console.warn('Super admin login email failed to send:', err?.message);
+        console.warn('[admin-login] Super admin login email failed to send:', err?.message);
       }
+    } else {
+      console.log('[admin-login] Skipped sending — condition not met (see flags above).');
     }
 
     return c.json({ ok: true, message: 'If this email is authorized, a login link has been sent.' });
