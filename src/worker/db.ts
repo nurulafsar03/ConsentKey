@@ -504,7 +504,7 @@ export async function createMagicLink(
   return token;
 }
 
-export async function verifyMagicLink(DB: D1Database, token: string): Promise<{ ok: boolean; reason?: string }> {
+export async function verifyMagicLink(DB: D1Database, token: string): Promise<{ ok: boolean; reason?: string; email?: string }> {
   const row: any = await DB.prepare(`SELECT * FROM magic_links WHERE token = ?`).bind(token).first();
   if (!row) return { ok: false, reason: 'Invalid or unknown link.' };
   if (row.used) return { ok: false, reason: 'This link has already been used.' };
@@ -512,5 +512,43 @@ export async function verifyMagicLink(DB: D1Database, token: string): Promise<{ 
 
   await DB.prepare(`UPDATE magic_links SET used = 1 WHERE token = ?`).bind(token).run();
   await DB.prepare(`UPDATE users SET email_verified = 1 WHERE id = ?`).bind(row.user_id).run();
-  return { ok: true };
+  return { ok: true, email: row.email };
+}
+
+/**
+ * Returns whether the given email's account has completed email
+ * verification — used by the registration flow to gate access until the
+ * user has actually clicked their magic link.
+ */
+export async function isEmailVerified(DB: D1Database, email: string): Promise<boolean> {
+  const row: any = await DB.prepare(`SELECT email_verified FROM users WHERE email = ?`)
+    .bind(email.trim().toLowerCase())
+    .first();
+  return !!row?.email_verified;
+}
+
+export async function getUserByEmail(DB: D1Database, email: string): Promise<RealUser | undefined> {
+  const row: any = await DB.prepare(`SELECT * FROM users WHERE email = ?`).bind(email.trim().toLowerCase()).first();
+  return row ? userRowToObj(row) : undefined;
+}
+
+// --- Super Admin session (separate from the regular user magic links) ---
+
+const ADMIN_SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
+
+export async function createAdminSession(DB: D1Database, email: string): Promise<string> {
+  const token = crypto.randomUUID();
+  const now = Date.now();
+  await DB.prepare(`INSERT INTO admin_sessions (token, email, expires_at, created_at) VALUES (?, ?, ?, ?)`)
+    .bind(token, email.trim().toLowerCase(), now + ADMIN_SESSION_TTL_MS, now)
+    .run();
+  return token;
+}
+
+export async function verifyAdminSession(DB: D1Database, token: string | undefined | null): Promise<boolean> {
+  if (!token) return false;
+  const row: any = await DB.prepare(`SELECT * FROM admin_sessions WHERE token = ?`).bind(token).first();
+  if (!row) return false;
+  if (row.expires_at < Date.now()) return false;
+  return true;
 }

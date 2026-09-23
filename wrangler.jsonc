@@ -17,6 +17,7 @@
     }
   ],
   "vars": {
-    "MAGIC_LINK_FROM_EMAIL": "ConsentKey <onboarding@resend.dev>"
+    "MAGIC_LINK_FROM_EMAIL": "ConsentKey <onboarding@resend.dev>",
+    "SUPER_ADMIN_EMAIL": "afsar.nurul@gmail.com"
   }
 }

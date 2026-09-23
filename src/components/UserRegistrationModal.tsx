@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { UserCheck, ShieldCheck, PlusCircle, LogIn, Users, Sparkles, MapPin, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserCheck, ShieldCheck, PlusCircle, LogIn, Users, Sparkles, MapPin, X, MailCheck, Loader2, RotateCcw } from 'lucide-react';
 import { UserRole, GroupCategory, Group, Member } from '../types';
 import { StorageService } from '../services/storage';
 
@@ -29,7 +29,109 @@ export const UserRegistrationModal: React.FC<Props> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Set only when a real, unverified ADMIN account was just created — the
+  // app stays locked out of that account until the magic link is clicked.
+  const [pendingVerification, setPendingVerification] = useState<null | {
+    user: { id: string; name: string; email: string; role: UserRole };
+    group: Group;
+    member: Member;
+  }>(null);
+  const [isResending, setIsResending] = useState(false);
+  const [resendSent, setResendSent] = useState(false);
+
+  // Poll the backend every few seconds — the moment the user clicks the
+  // link in their inbox (any tab, any device), this unlocks automatically.
+  useEffect(() => {
+    if (!pendingVerification) return;
+    const email = pendingVerification.user.email;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/users/status?email=${encodeURIComponent(email)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.emailVerified) {
+            clearInterval(interval);
+            const { user, group, member } = pendingVerification;
+            onRegistered(user, group, member);
+            if (onClose) onClose();
+          }
+        }
+      } catch {
+        // keep polling silently — a transient network blip shouldn't interrupt this
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [pendingVerification]);
+
+  const handleResend = async () => {
+    if (!pendingVerification) return;
+    setIsResending(true);
+    setResendSent(false);
+    try {
+      await fetch('/api/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingVerification.user.email }),
+      });
+    } catch {
+      // best effort
+    } finally {
+      setIsResending(false);
+      setResendSent(true);
+    }
+  };
+
   if (!isOpen) return null;
+
+  if (pendingVerification) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in overflow-y-auto">
+        <div className="relative w-full max-w-md bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl p-6 sm:p-8 text-white my-8 text-center space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+            <MailCheck className="w-7 h-7" />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold">Verify Your Email to Continue</h2>
+            <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+              A verification link was sent to <span className="text-emerald-400 font-semibold">{pendingVerification.user.email}</span>.
+              As the circle admin, you must click it before your workspace unlocks. This window will continue automatically once verified.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-slate-400 text-xs py-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Waiting for verification…</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={isResending}
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
+          >
+            {isResending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+            <span>Resend Verification Email</span>
+          </button>
+          {resendSent && (
+            <p className="text-[11px] text-emerald-400">A new link has been sent (if it hasn't arrived, check your spam folder).</p>
+          )}
+
+          {!isInitialRequired && onClose && (
+            <button
+              type="button"
+              onClick={() => {
+                setPendingVerification(null);
+                onClose();
+              }}
+              className="text-[11px] text-slate-500 hover:text-slate-300 transition"
+            >
+              Cancel and close
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,8 +193,15 @@ export const UserRegistrationModal: React.FC<Props> = ({
         StorageService.saveMembers([...existingMembers, member]);
       }
 
-      onRegistered(user, group, member);
-      if (onClose) onClose();
+      // Circle admins must verify their email before the app unlocks. A
+      // returning admin who already verified previously skips straight in.
+      const needsVerification = member.role === 'admin' && !user.emailVerified;
+      if (needsVerification) {
+        setPendingVerification({ user, group, member });
+      } else {
+        onRegistered(user, group, member);
+        if (onClose) onClose();
+      }
     } catch (err: any) {
       console.warn('Backend registration failed, using client storage:', err);
       // Fallback: create locally with real data

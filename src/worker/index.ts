@@ -9,9 +9,13 @@ import {
   getMessages,
   createMagicLink,
   verifyMagicLink,
+  isEmailVerified,
+  getUserByEmail,
   getAllMembersForAdmin,
   updateMemberAndUser,
   deleteMemberCascade,
+  createAdminSession,
+  verifyAdminSession,
 } from './db';
 import { sendMagicLinkEmail } from './email';
 
@@ -22,9 +26,23 @@ export interface Env {
   RESEND_API_KEY?: string;
   MAGIC_LINK_FROM_EMAIL?: string; // e.g. "ConsentKey <onboarding@resend.dev>"
   PUBLIC_SITE_URL?: string; // e.g. "https://consentkey.<subdomain>.workers.dev"
+  SUPER_ADMIN_EMAIL?: string; // the ONLY email allowed to log into the Super Admin panel
 }
 
 const app = new Hono<{ Bindings: Env }>();
+
+const ADMIN_SESSION_COOKIE = 'ck_admin_session';
+
+function getCookie(req: Request, name: string): string | undefined {
+  const header = req.headers.get('Cookie') || '';
+  const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
+async function requireAdminSession(c: any): Promise<boolean> {
+  const token = getCookie(c.req.raw, ADMIN_SESSION_COOKIE);
+  return verifyAdminSession(c.env.DB, token);
+}
 
 // ---- Health check ----
 app.get('/api/health', (c) => c.json({ status: 'ok', backend: 'cloudflare-workers-d1' }));
@@ -100,6 +118,47 @@ a{color:#34d399}</style></head>
     return c.html(page('Verification failed', result.reason || 'Something went wrong.', false), 400);
   }
   return c.html(page('Email verified ✅', 'Your ConsentKey account is now fully verified.', true));
+});
+
+// ---- Poll email-verification status (used by the registration screen to ----
+// ---- unlock the app only after the user clicks their magic link) ----
+app.get('/api/users/status', async (c) => {
+  const email = c.req.query('email');
+  if (!email) return c.json({ error: 'email is required' }, 400);
+  try {
+    const verified = await isEmailVerified(c.env.DB, email);
+    return c.json({ emailVerified: verified });
+  } catch (err: any) {
+    return c.json({ error: err?.message }, 500);
+  }
+});
+
+// ---- Resend a verification link (magic link expires after 30 minutes) ----
+app.post('/api/resend-verification', async (c) => {
+  try {
+    const { email } = await c.req.json().catch(() => ({}) as any);
+    if (!email) return c.json({ error: 'email is required' }, 400);
+
+    const user = await getUserByEmail(c.env.DB, email);
+    if (!user) return c.json({ ok: true }); // don't leak whether an account exists
+    if (user.emailVerified) return c.json({ ok: true, alreadyVerified: true });
+    if (!c.env.RESEND_API_KEY) return c.json({ error: 'Email sending is not configured' }, 500);
+
+    const token = await createMagicLink(c.env.DB, user.id, user.email);
+    const siteUrl = c.env.PUBLIC_SITE_URL || new URL(c.req.url).origin;
+    const magicLink = `${siteUrl}/api/verify?token=${token}`;
+    await sendMagicLinkEmail({
+      apiKey: c.env.RESEND_API_KEY,
+      fromEmail: c.env.MAGIC_LINK_FROM_EMAIL || 'ConsentKey <onboarding@resend.dev>',
+      toEmail: user.email,
+      toName: user.name,
+      magicLink,
+      circleName: 'ConsentKey',
+    });
+    return c.json({ ok: true });
+  } catch (err: any) {
+    return c.json({ error: err?.message }, 500);
+  }
 });
 
 // ---- Groups ----
@@ -195,8 +254,74 @@ app.post('/api/groups/:id/messages', async (c) => {
   }
 });
 
+// ---- Super Admin authentication: fixed-email magic-link login ----
+// The panel is only reachable by whichever single email is configured as
+// SUPER_ADMIN_EMAIL. This endpoint always responds identically whether or
+// not the submitted email matches, so the real address can't be discovered
+// by probing it.
+app.post('/api/admin/request-login', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}) as any);
+    const attempt = (body?.email || '').trim().toLowerCase();
+    const superEmail = (c.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
+
+    if (superEmail && attempt === superEmail && c.env.RESEND_API_KEY) {
+      const token = await createMagicLink(c.env.DB, 'super_admin', superEmail);
+      const siteUrl = c.env.PUBLIC_SITE_URL || new URL(c.req.url).origin;
+      const verifyLink = `${siteUrl}/api/admin/verify?token=${token}`;
+      try {
+        await sendMagicLinkEmail({
+          apiKey: c.env.RESEND_API_KEY,
+          fromEmail: c.env.MAGIC_LINK_FROM_EMAIL || 'ConsentKey <onboarding@resend.dev>',
+          toEmail: superEmail,
+          toName: 'Super Admin',
+          magicLink: verifyLink,
+          circleName: 'Super Admin Panel',
+        });
+      } catch (err: any) {
+        console.warn('Super admin login email failed to send:', err?.message);
+      }
+    }
+
+    return c.json({ ok: true, message: 'If this email is authorized, a login link has been sent.' });
+  } catch (err: any) {
+    return c.json({ error: err?.message }, 500);
+  }
+});
+
+app.get('/api/admin/verify', async (c) => {
+  const token = c.req.query('token');
+  const siteUrl = c.env.PUBLIC_SITE_URL || new URL(c.req.url).origin;
+  if (!token) return c.redirect(`${siteUrl}/admin?authed=0`, 302);
+
+  const result = await verifyMagicLink(c.env.DB, token);
+  const superEmail = (c.env.SUPER_ADMIN_EMAIL || '').trim().toLowerCase();
+  if (!result.ok || !superEmail) return c.redirect(`${siteUrl}/admin?authed=0`, 302);
+
+  const session = await createAdminSession(c.env.DB, superEmail);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: `${siteUrl}/admin?authed=1`,
+      'Set-Cookie': `${ADMIN_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=43200`,
+    },
+  });
+});
+
+app.post('/api/admin/logout', async (c) => {
+  return new Response(JSON.stringify({ ok: true }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Set-Cookie': `${ADMIN_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+    },
+  });
+});
+
 // ---- Super Admin: full user/member directory across every circle ----
+// Every route below requires a valid admin session cookie (see /api/admin/verify above).
 app.get('/api/admin/members', async (c) => {
+  if (!(await requireAdminSession(c))) return c.json({ error: 'Not authenticated' }, 401);
   try {
     const members = await getAllMembersForAdmin(c.env.DB);
     return c.json(members);
@@ -206,6 +331,7 @@ app.get('/api/admin/members', async (c) => {
 });
 
 app.patch('/api/admin/members/:id', async (c) => {
+  if (!(await requireAdminSession(c))) return c.json({ error: 'Not authenticated' }, 401);
   try {
     const body = await c.req.json();
     const role = body.role === 'admin' ? 'admin' : body.role === 'member' ? 'member' : undefined;
@@ -222,6 +348,7 @@ app.patch('/api/admin/members/:id', async (c) => {
 });
 
 app.delete('/api/admin/members/:id', async (c) => {
+  if (!(await requireAdminSession(c))) return c.json({ error: 'Not authenticated' }, 401);
   try {
     const result = await deleteMemberCascade(c.env.DB, c.req.param('id'));
     if (!result.ok) return c.json({ error: result.reason || 'Delete failed' }, 404);

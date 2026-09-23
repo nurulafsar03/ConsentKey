@@ -70,6 +70,12 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // ---- Super Admin session gate (fixed email, magic-link login) ----
+  const [isAdminAuthed, setIsAdminAuthed] = useState<boolean | null>(null); // null = still checking
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginSent, setLoginSent] = useState(false);
+  const [isSendingLogin, setIsSendingLogin] = useState(false);
+
   // ---- Super Admin: real user/member directory (all circles, delete + edit) ----
   const [adminMembers, setAdminMembers] = useState<Member[]>([]);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
@@ -87,7 +93,12 @@ export const AdminPanelModal: React.FC<Props> = ({
     setMembersError(null);
     try {
       const res = await fetch('/api/admin/members');
+      if (res.status === 401) {
+        setIsAdminAuthed(false);
+        return;
+      }
       if (!res.ok) throw new Error('Failed to load users');
+      setIsAdminAuthed(true);
       const data = await res.json();
       setAdminMembers(Array.isArray(data) ? data : []);
     } catch (err: any) {
@@ -97,12 +108,40 @@ export const AdminPanelModal: React.FC<Props> = ({
     }
   };
 
+  // Check the admin session as soon as the panel opens (not only when the
+  // Users tab is active) — every tab here is gated, not just the directory.
   useEffect(() => {
-    if (isOpen && activeTab === 'users') {
+    if (isOpen) {
+      loadAdminMembers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'users' && isAdminAuthed) {
       loadAdminMembers();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, activeTab]);
+
+  const requestLoginLink = async () => {
+    if (!loginEmail.trim()) return;
+    setIsSendingLogin(true);
+    try {
+      await fetch('/api/admin/request-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginEmail.trim() }),
+      });
+    } catch {
+      // Deliberately silent — see backend comment: response is identical
+      // whether or not the email matches, so this can't be used to probe
+      // for the real super admin address.
+    } finally {
+      setIsSendingLogin(false);
+      setLoginSent(true);
+    }
+  };
 
   const startEditMember = (m: any) => {
     setEditingMemberId(m.id);
@@ -540,6 +579,57 @@ export const AdminPanelModal: React.FC<Props> = ({
           </button>
         </div>
 
+        {/* ===================================================================
+            SUPER ADMIN LOGIN GATE — the panel's tabs & data only render once
+            a valid admin session cookie has been confirmed by the backend.
+            =================================================================== */}
+        {isAdminAuthed !== true ? (
+          <div className="flex-1 overflow-y-auto p-6 sm:p-10 flex items-center justify-center">
+            {isAdminAuthed === null ? (
+              <div className="flex items-center gap-2 text-slate-400 text-sm">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Checking access…
+              </div>
+            ) : (
+              <div className="w-full max-w-sm space-y-4 text-center">
+                <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <ShieldAlert className="w-7 h-7" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Super Admin Login Required</h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    This panel is restricted to one designated email. Enter it to receive a one-time login link — the link only works for the authorized super admin address.
+                  </p>
+                </div>
+                {loginSent ? (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
+                    If that email is authorized, a login link has been sent. Open it from your inbox to continue — this window will unlock automatically.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <input
+                      type="email"
+                      value={loginEmail}
+                      onChange={(e) => setLoginEmail(e.target.value)}
+                      placeholder="super admin email"
+                      className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white placeholder-slate-500 text-sm text-center focus:outline-hidden focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={requestLoginLink}
+                      disabled={!loginEmail.trim() || isSendingLogin}
+                      className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm transition disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isSendingLogin && <Loader2 className="w-4 h-4 animate-spin" />}
+                      <span>Send Login Link</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
         {/* Tab Navigation */}
         <div className={`flex items-center gap-2 px-6 py-2 border-b text-xs font-bold overflow-x-auto ${
           isDark ? 'border-slate-800 bg-slate-950/30' : 'border-slate-200 bg-slate-100/50'
@@ -589,7 +679,7 @@ export const AdminPanelModal: React.FC<Props> = ({
             }`}
           >
             <Users className="w-4 h-4" />
-            <span>Fleet & Users ({members.length})</span>
+            <span>Fleet & Users ({adminMembers.length})</span>
           </button>
         </div>
 
@@ -1994,6 +2084,8 @@ export const AdminPanelModal: React.FC<Props> = ({
             </form>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
