@@ -27,11 +27,13 @@ export interface Group {
 
 export interface Member {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   avatar: string;
   role: UserRole;
   groupId: string;
+  groupName?: string;
   isConsentGiven: boolean;
   isSharingLocation: boolean;
   lastConsentTimestamp: number;

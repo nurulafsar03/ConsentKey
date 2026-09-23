@@ -9,6 +9,9 @@ import {
   getMessages,
   createMagicLink,
   verifyMagicLink,
+  getAllMembersForAdmin,
+  updateMemberAndUser,
+  deleteMemberCascade,
 } from './db';
 import { sendMagicLinkEmail } from './email';
 
@@ -187,6 +190,42 @@ app.post('/api/groups/:id/messages', async (c) => {
       audioDurationSeconds,
     });
     return c.json(message);
+  } catch (err: any) {
+    return c.json({ error: err?.message }, 500);
+  }
+});
+
+// ---- Super Admin: full user/member directory across every circle ----
+app.get('/api/admin/members', async (c) => {
+  try {
+    const members = await getAllMembersForAdmin(c.env.DB);
+    return c.json(members);
+  } catch (err: any) {
+    return c.json({ error: err?.message }, 500);
+  }
+});
+
+app.patch('/api/admin/members/:id', async (c) => {
+  try {
+    const body = await c.req.json();
+    const role = body.role === 'admin' ? 'admin' : body.role === 'member' ? 'member' : undefined;
+    const updated = await updateMemberAndUser(c.env.DB, c.req.param('id'), {
+      name: typeof body.name === 'string' ? body.name : undefined,
+      email: typeof body.email === 'string' ? body.email : undefined,
+      role,
+    });
+    if (!updated) return c.json({ error: 'Member not found' }, 404);
+    return c.json(updated);
+  } catch (err: any) {
+    return c.json({ error: err?.message }, 500);
+  }
+});
+
+app.delete('/api/admin/members/:id', async (c) => {
+  try {
+    const result = await deleteMemberCascade(c.env.DB, c.req.param('id'));
+    if (!result.ok) return c.json({ error: result.reason || 'Delete failed' }, 404);
+    return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err?.message }, 500);
   }

@@ -24,11 +24,13 @@ export interface RealGroup {
 
 export interface RealMember {
   id: string;
+  userId?: string;
   name: string;
   email: string;
   avatar: string;
   role: 'admin' | 'member';
   groupId: string;
+  groupName?: string;
   isConsentGiven: boolean;
   isSharingLocation: boolean;
   lastConsentTimestamp: number;
@@ -64,11 +66,13 @@ function randomId(prefix: string): string {
 function memberRowToObj(row: any): RealMember {
   return {
     id: row.id,
+    userId: row.user_id ?? undefined,
     name: row.name,
     email: row.email,
     avatar: row.avatar,
     role: row.role,
     groupId: row.group_id,
+    groupName: row.group_name ?? undefined,
     isConsentGiven: !!row.is_consent_given,
     isSharingLocation: !!row.is_sharing_location,
     lastConsentTimestamp: row.last_consent_timestamp,
@@ -79,6 +83,17 @@ function memberRowToObj(row: any): RealMember {
     battery: row.battery ?? undefined,
     accuracy: row.accuracy ?? undefined,
     isOnline: !!row.is_online,
+  };
+}
+
+function userRowToObj(row: any): RealUser {
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    emailVerified: !!row.email_verified,
+    createdAt: row.created_at,
   };
 }
 
@@ -111,6 +126,81 @@ function messageRowToObj(row: any): RealChatMessage {
   };
 }
 
+function makeAvatar(name: string): string {
+  return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
+    name
+  )}&backgroundColor=0284c7,0d9488,059669`;
+}
+
+async function insertMember(
+  DB: D1Database,
+  user: RealUser,
+  groupId: string,
+  role: 'admin' | 'member',
+  now: number
+): Promise<RealMember> {
+  const member: RealMember = {
+    id: randomId('mem'),
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+    avatar: makeAvatar(user.name),
+    role,
+    groupId,
+    isConsentGiven: true,
+    isSharingLocation: true,
+    lastConsentTimestamp: now,
+    isOnline: true,
+  };
+
+  await DB.prepare(
+    `INSERT INTO members (id, user_id, name, email, avatar, role, group_id, is_consent_given, is_sharing_location, last_consent_timestamp, is_online)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, 1)`
+  )
+    .bind(member.id, member.userId, member.name, member.email, member.avatar, member.role, member.groupId, now)
+    .run();
+
+  return member;
+}
+
+async function createGroupForUser(
+  DB: D1Database,
+  user: RealUser,
+  groupName: string | undefined,
+  groupCategory: string | undefined,
+  now: number
+): Promise<RealGroup> {
+  const groupId = randomId('grp');
+  const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
+  const codePrefix = (groupName || 'TEAM').slice(0, 4).toUpperCase();
+  const inviteCode = `${codePrefix}-${randomCode}`;
+
+  const group: RealGroup = {
+    id: groupId,
+    name: groupName?.trim() || `${user.name}'s Circle`,
+    category: groupCategory || (user.role === 'admin' ? 'family' : 'friends'),
+    adminId: user.id,
+    adminName: user.name,
+    adminEmail: user.email,
+    inviteCode,
+    createdAt: now,
+  };
+
+  await DB.prepare(
+    `INSERT INTO groups (id, name, category, admin_id, admin_name, admin_email, invite_code, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  )
+    .bind(group.id, group.name, group.category, group.adminId, group.adminName, group.adminEmail, group.inviteCode, now)
+    .run();
+
+  return group;
+}
+
+/**
+ * Registers a real user, or — if the email already has an account — logs
+ * them back into their existing circle instead of creating a duplicate
+ * admin/user/circle. This prevents the same email + name from piling up
+ * repeat "admin" accounts every time the registration form is submitted.
+ */
 export async function registerUser(
   DB: D1Database,
   params: {
@@ -122,93 +212,167 @@ export async function registerUser(
     groupCategory?: string;
     inviteCode?: string;
   }
-): Promise<{ user: RealUser; group: RealGroup; member: RealMember }> {
+): Promise<{ user: RealUser; group: RealGroup; member: RealMember; isReturningUser: boolean }> {
   const now = Date.now();
-  const userId = randomId('usr');
-  const email = params.name ? params.email.trim().toLowerCase() : '';
+  const email = params.email.trim().toLowerCase();
+  const name = params.name.trim();
 
-  const user: RealUser = {
-    id: userId,
-    name: params.name.trim(),
-    email,
-    role: params.role || 'member',
-    emailVerified: false,
-    createdAt: now,
-  };
+  const existingUserRow: any = await DB.prepare(`SELECT * FROM users WHERE email = ?`).bind(email).first();
 
-  await DB.prepare(
-    `INSERT INTO users (id, name, email, role, email_verified, created_at) VALUES (?, ?, ?, ?, 0, ?)`
-  )
+  // ---- JOIN an existing circle by invite code ----
+  if (params.groupAction === 'join' && params.inviteCode) {
+    const code = params.inviteCode.trim().toUpperCase();
+    const groupRow: any = await DB.prepare(`SELECT * FROM groups WHERE UPPER(invite_code) = ?`).bind(code).first();
+    if (!groupRow) throw new Error('Invite code not found');
+    const group = groupRowToObj(groupRow);
+
+    // Already a member of this exact circle? -> auto-login, no duplicate row.
+    const existingMemberRow: any = await DB.prepare(
+      `SELECT * FROM members WHERE group_id = ? AND LOWER(email) = ?`
+    )
+      .bind(group.id, email)
+      .first();
+
+    if (existingMemberRow) {
+      const user = existingUserRow
+        ? userRowToObj(existingUserRow)
+        : { id: existingMemberRow.user_id || randomId('usr'), name: existingMemberRow.name, email, role: existingMemberRow.role, emailVerified: false, createdAt: now };
+      return { user, group, member: memberRowToObj(existingMemberRow), isReturningUser: true };
+    }
+
+    const user: RealUser = existingUserRow
+      ? userRowToObj(existingUserRow)
+      : { id: randomId('usr'), name, email, role: 'member', emailVerified: false, createdAt: now };
+
+    if (!existingUserRow) {
+      await DB.prepare(`INSERT INTO users (id, name, email, role, email_verified, created_at) VALUES (?, ?, ?, ?, 0, ?)`)
+        .bind(user.id, user.name, user.email, user.role, now)
+        .run();
+    }
+
+    const member = await insertMember(DB, user, group.id, 'member', now);
+    return { user, group, member, isReturningUser: false };
+  }
+
+  // ---- CREATE a new circle, or auto-login a returning user to their circle ----
+  if (existingUserRow) {
+    const user = userRowToObj(existingUserRow);
+
+    // Prefer a circle where they're the admin; otherwise any circle they belong to.
+    const memberRow: any = await DB.prepare(
+      `SELECT * FROM members WHERE LOWER(email) = ? ORDER BY (role = 'admin') DESC LIMIT 1`
+    )
+      .bind(email)
+      .first();
+
+    if (memberRow) {
+      const groupRow: any = await DB.prepare(`SELECT * FROM groups WHERE id = ?`).bind(memberRow.group_id).first();
+      if (groupRow) {
+        return { user, group: groupRowToObj(groupRow), member: memberRowToObj(memberRow), isReturningUser: true };
+      }
+    }
+
+    // Existing account but no circle yet (edge case) — create one now.
+    const group = await createGroupForUser(DB, user, params.groupName, params.groupCategory, now);
+    const member = await insertMember(DB, user, group.id, 'admin', now);
+    return { user, group, member, isReturningUser: false };
+  }
+
+  // ---- Brand-new user ----
+  const user: RealUser = { id: randomId('usr'), name, email, role: params.role || 'member', emailVerified: false, createdAt: now };
+  await DB.prepare(`INSERT INTO users (id, name, email, role, email_verified, created_at) VALUES (?, ?, ?, ?, 0, ?)`)
     .bind(user.id, user.name, user.email, user.role, now)
     .run();
 
-  let targetGroup: RealGroup | undefined;
+  const group = await createGroupForUser(DB, user, params.groupName, params.groupCategory, now);
+  const member = await insertMember(DB, user, group.id, 'admin', now);
+  return { user, group, member, isReturningUser: false };
+}
 
-  if (params.groupAction === 'join' && params.inviteCode) {
-    const code = params.inviteCode.trim().toUpperCase();
-    const row = await DB.prepare(`SELECT * FROM groups WHERE UPPER(invite_code) = ?`)
-      .bind(code)
-      .first();
-    if (row) targetGroup = groupRowToObj(row);
-  }
+/**
+ * Full member/user directory across every circle, for the Super Admin panel.
+ * Includes the circle name so the panel doesn't need a separate groups fetch.
+ */
+export async function getAllMembersForAdmin(DB: D1Database): Promise<RealMember[]> {
+  const { results } = await DB.prepare(
+    `SELECT m.*, g.name as group_name
+     FROM members m
+     LEFT JOIN groups g ON g.id = m.group_id
+     ORDER BY m.id DESC`
+  ).all();
+  return (results || []).map(memberRowToObj);
+}
 
-  if (!targetGroup) {
-    const groupId = randomId('grp');
-    const randomCode = Math.floor(1000 + Math.random() * 9000).toString();
-    const codePrefix = (params.groupName || 'TEAM').slice(0, 4).toUpperCase();
-    const inviteCode = `${codePrefix}-${randomCode}`;
+/**
+ * Updates a member's profile. If this member row is linked to a real user
+ * account (user_id set), the users table and — if they're a circle admin —
+ * the circle's displayed admin name/email are kept in sync too.
+ */
+export async function updateMemberAndUser(
+  DB: D1Database,
+  memberId: string,
+  updates: { name?: string; email?: string; role?: 'admin' | 'member' }
+): Promise<RealMember | undefined> {
+  const memberRow: any = await DB.prepare(`SELECT * FROM members WHERE id = ?`).bind(memberId).first();
+  if (!memberRow) return undefined;
 
-    targetGroup = {
-      id: groupId,
-      name: params.groupName?.trim() || `${user.name}'s Circle`,
-      category: params.groupCategory || (user.role === 'admin' ? 'family' : 'friends'),
-      adminId: user.id,
-      adminName: user.name,
-      adminEmail: user.email,
-      inviteCode,
-      createdAt: now,
-    };
+  const name = updates.name?.trim() || memberRow.name;
+  const email = updates.email?.trim().toLowerCase() || memberRow.email;
+  const role = updates.role || memberRow.role;
 
-    await DB.prepare(
-      `INSERT INTO groups (id, name, category, admin_id, admin_name, admin_email, invite_code, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        targetGroup.id,
-        targetGroup.name,
-        targetGroup.category,
-        targetGroup.adminId,
-        targetGroup.adminName,
-        targetGroup.adminEmail,
-        targetGroup.inviteCode,
-        now
-      )
+  await DB.prepare(`UPDATE members SET name = ?, email = ?, role = ? WHERE id = ?`)
+    .bind(name, email, role, memberId)
+    .run();
+
+  if (memberRow.user_id) {
+    await DB.prepare(`UPDATE users SET name = ?, email = ?, role = ? WHERE id = ?`)
+      .bind(name, email, role, memberRow.user_id)
+      .run();
+    await DB.prepare(`UPDATE groups SET admin_name = ?, admin_email = ? WHERE admin_id = ?`)
+      .bind(name, email, memberRow.user_id)
       .run();
   }
 
-  const memberId = `mem_${user.id}`;
-  const member: RealMember = {
-    id: memberId,
-    name: user.name,
-    email: user.email,
-    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-      user.name
-    )}&backgroundColor=0284c7,0d9488,059669`,
-    role: targetGroup.adminId === user.id ? 'admin' : user.role,
-    groupId: targetGroup.id,
-    isConsentGiven: true,
-    isSharingLocation: true,
-    lastConsentTimestamp: now,
-    isOnline: true,
-  };
-
-  await DB.prepare(
-    `INSERT INTO members (id, name, email, avatar, role, group_id, is_consent_given, is_sharing_location, last_consent_timestamp, is_online)
-     VALUES (?, ?, ?, ?, ?, ?, 1, 1, ?, 1)`
+  const updatedRow: any = await DB.prepare(
+    `SELECT m.*, g.name as group_name FROM members m LEFT JOIN groups g ON g.id = m.group_id WHERE m.id = ?`
   )
-    .bind(member.id, member.name, member.email, member.avatar, member.role, member.groupId, now)
-    .run();
+    .bind(memberId)
+    .first();
+  return updatedRow ? memberRowToObj(updatedRow) : undefined;
+}
 
-  return { user, group: targetGroup, member };
+/**
+ * Deletes a member from the Super Admin panel. If the member was the
+ * admin of their circle, the whole circle (its members + messages) is
+ * removed too, since a circle can't meaningfully exist without its admin.
+ * If the underlying user has no other memberships left anywhere, their
+ * account and any pending magic links are removed as well — this is what
+ * lets a super admin fully clean up duplicate/test accounts.
+ */
+export async function deleteMemberCascade(DB: D1Database, memberId: string): Promise<{ ok: boolean; reason?: string }> {
+  const memberRow: any = await DB.prepare(`SELECT * FROM members WHERE id = ?`).bind(memberId).first();
+  if (!memberRow) return { ok: false, reason: 'Member not found' };
+
+  await DB.prepare(`DELETE FROM members WHERE id = ?`).bind(memberId).run();
+
+  const userId = memberRow.user_id;
+
+  const groupRow: any = await DB.prepare(`SELECT * FROM groups WHERE id = ?`).bind(memberRow.group_id).first();
+  if (groupRow && userId && groupRow.admin_id === userId) {
+    await DB.prepare(`DELETE FROM messages WHERE group_id = ?`).bind(groupRow.id).run();
+    await DB.prepare(`DELETE FROM members WHERE group_id = ?`).bind(groupRow.id).run();
+    await DB.prepare(`DELETE FROM groups WHERE id = ?`).bind(groupRow.id).run();
+  }
+
+  if (userId) {
+    const remaining: any = await DB.prepare(`SELECT COUNT(*) as c FROM members WHERE user_id = ?`).bind(userId).first();
+    if (!remaining || remaining.c === 0) {
+      await DB.prepare(`DELETE FROM users WHERE id = ?`).bind(userId).run();
+      await DB.prepare(`DELETE FROM magic_links WHERE user_id = ?`).bind(userId).run();
+    }
+  }
+
+  return { ok: true };
 }
 
 export async function getGroupByInviteCode(DB: D1Database, code: string): Promise<RealGroup | undefined> {

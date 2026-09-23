@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   ShieldAlert,
   Users,
@@ -35,6 +35,8 @@ import {
   Film,
   Type,
   GripVertical,
+  Pencil,
+  Loader2,
 } from 'lucide-react';
 import { AdCampaign, AdDurationPeriod, AdPlacement, AdSize, AdType, Member, Group } from '../types';
 import { TranslationDict } from '../i18n/translations';
@@ -67,6 +69,86 @@ export const AdminPanelModal: React.FC<Props> = ({
   const [campaignList, setCampaignList] = useState<AdCampaign[]>(initialCampaigns);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // ---- Super Admin: real user/member directory (all circles, delete + edit) ----
+  const [adminMembers, setAdminMembers] = useState<Member[]>([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+  const [membersError, setMembersError] = useState<string | null>(null);
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editRole, setEditRole] = useState<'admin' | 'member'>('member');
+  const [savingMemberId, setSavingMemberId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingMemberId, setDeletingMemberId] = useState<string | null>(null);
+
+  const loadAdminMembers = async () => {
+    setIsLoadingMembers(true);
+    setMembersError(null);
+    try {
+      const res = await fetch('/api/admin/members');
+      if (!res.ok) throw new Error('Failed to load users');
+      const data = await res.json();
+      setAdminMembers(Array.isArray(data) ? data : []);
+    } catch (err: any) {
+      setMembersError(err?.message || 'Failed to load users');
+    } finally {
+      setIsLoadingMembers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'users') {
+      loadAdminMembers();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeTab]);
+
+  const startEditMember = (m: any) => {
+    setEditingMemberId(m.id);
+    setEditName(m.name);
+    setEditEmail(m.email);
+    setEditRole(m.role);
+    setConfirmDeleteId(null);
+  };
+
+  const cancelEditMember = () => setEditingMemberId(null);
+
+  const saveEditMember = async (id: string) => {
+    if (!editName.trim() || !editEmail.trim()) return;
+    setSavingMemberId(id);
+    try {
+      const res = await fetch(`/api/admin/members/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName.trim(), email: editEmail.trim(), role: editRole }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setAdminMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...updated } : m)));
+        setEditingMemberId(null);
+      }
+    } catch {
+      // best effort — keep the edit form open so the admin can retry
+    } finally {
+      setSavingMemberId(null);
+    }
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    setDeletingMemberId(id);
+    try {
+      const res = await fetch(`/api/admin/members/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setAdminMembers((prev) => prev.filter((m) => m.id !== id));
+      }
+    } catch {
+      // best effort
+    } finally {
+      setDeletingMemberId(null);
+      setConfirmDeleteId(null);
+    }
+  };
 
   // Creative Studio Builder State (Images, Videos, YouTube, Rich Text Cards, Auto Embed Generator)
   const [studioMediaType, setStudioMediaType] = useState<'image' | 'video' | 'youtube' | 'text_card'>('image');
@@ -556,87 +638,169 @@ export const AdminPanelModal: React.FC<Props> = ({
               ========================================================================= */}
           {activeTab === 'users' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between flex-wrap gap-2">
                 <div>
                   <h3 className="text-base font-bold">Connected Users & Field Devices</h3>
                   <p className="text-xs text-slate-400">
-                    Live GPS telemetry, role assignments, consent state, and battery status.
+                    Every real account across every circle. Edit or delete unwanted / duplicate accounts here.
                   </p>
                 </div>
-                <div className="px-3 py-1 rounded-xl bg-cyan-950/60 border border-cyan-800 text-cyan-300 text-xs font-semibold">
-                  {members.filter((m) => m.isSharingLocation).length} Sharing GPS Now
+                <div className="flex items-center gap-2">
+                  <div className="px-3 py-1 rounded-xl bg-cyan-950/60 border border-cyan-800 text-cyan-300 text-xs font-semibold">
+                    {adminMembers.length} Total Accounts
+                  </div>
+                  <button
+                    type="button"
+                    onClick={loadAdminMembers}
+                    disabled={isLoadingMembers}
+                    className="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isLoadingMembers ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+                    <span>Refresh</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {members.map((member) => (
-                  <div
-                    key={member.id}
-                    className={`p-4 rounded-2xl border flex items-center justify-between ${
-                      isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <img
-                          src={member.avatar}
-                          alt={member.name}
-                          className="w-11 h-11 rounded-full object-cover border-2 border-slate-700"
-                        />
-                        <span
-                          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-900 ${
-                            member.isOnline ? 'bg-emerald-500' : 'bg-slate-500'
-                          }`}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-sm">{member.name}</span>
-                          <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                              member.role === 'admin'
-                                ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                                : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
-                            }`}
-                          >
-                            {member.role}
-                          </span>
-                        </div>
-                        <p className="text-xs text-slate-400">{member.email}</p>
-                        <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">
-                          <span className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-emerald-400" />
-                            {member.isSharingLocation
-                              ? `${member.lat?.toFixed(4)}, ${member.lng?.toFixed(4)}`
-                              : 'Location Hidden'}
-                          </span>
-                          {member.battery !== undefined && (
-                            <span className="flex items-center gap-1">
-                              <Battery className="w-3 h-3 text-cyan-400" />
-                              {member.battery}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              {membersError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-medium">
+                  {membersError}
+                </div>
+              )}
 
-                    <div className="text-right space-y-1">
-                      <span
-                        className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-md ${
-                          member.isConsentGiven
-                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                            : 'bg-rose-950 text-rose-400 border border-rose-800'
-                        }`}
-                      >
-                        {member.isConsentGiven ? 'Consent Active' : 'Consent Revoked'}
-                      </span>
-                      <p className="text-[10px] text-slate-400">
-                        Room: {groups.find((g) => g.id === member.groupId)?.name || 'Default Circle'}
-                      </p>
+              {isLoadingMembers && adminMembers.length === 0 ? (
+                <div className="p-8 flex items-center justify-center text-slate-400 text-sm gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading real accounts…
+                </div>
+              ) : adminMembers.length === 0 ? (
+                <div className="p-8 text-center text-slate-400 text-sm">No real accounts yet.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {adminMembers.map((member: any) => (
+                    <div
+                      key={member.id}
+                      className={`p-4 rounded-2xl border ${
+                        isDark ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}
+                    >
+                      {editingMemberId === member.id ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            placeholder="Full name"
+                            className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:outline-hidden focus:border-emerald-500"
+                          />
+                          <input
+                            type="email"
+                            value={editEmail}
+                            onChange={(e) => setEditEmail(e.target.value)}
+                            placeholder="Email"
+                            className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:outline-hidden focus:border-emerald-500"
+                          />
+                          <div className="flex items-center gap-2">
+                            <select
+                              value={editRole}
+                              onChange={(e) => setEditRole(e.target.value as 'admin' | 'member')}
+                              className="flex-1 px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white text-xs focus:outline-hidden focus:border-emerald-500"
+                            >
+                              <option value="admin">Admin</option>
+                              <option value="member">Member</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => saveEditMember(member.id)}
+                              disabled={savingMemberId === member.id}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                            >
+                              {savingMemberId === member.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditMember}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative shrink-0">
+                              <img
+                                src={member.avatar}
+                                alt={member.name}
+                                className="w-11 h-11 rounded-full object-cover border-2 border-slate-700"
+                              />
+                              <span
+                                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-slate-900 ${
+                                  member.isOnline ? 'bg-emerald-500' : 'bg-slate-500'
+                                }`}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm truncate">{member.name}</span>
+                                <span
+                                  className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase shrink-0 ${
+                                    member.role === 'admin'
+                                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                      : 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30'
+                                  }`}
+                                >
+                                  {member.role}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-400 truncate">{member.email}</p>
+                              <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+                                Circle: {member.groupName || 'Unknown Circle'}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => startEditMember(member)}
+                              title="Edit user"
+                              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            {confirmDeleteId === member.id ? (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMember(member.id)}
+                                disabled={deletingMemberId === member.id}
+                                title="Click again to confirm delete"
+                                className="px-2.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold flex items-center gap-1 transition cursor-pointer disabled:opacity-50"
+                              >
+                                {deletingMemberId === member.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <>Confirm?</>
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteId(member.id)}
+                                title="Delete user"
+                                className="p-2 rounded-lg bg-slate-800 hover:bg-rose-950 border border-slate-700 hover:border-rose-800 text-slate-300 hover:text-rose-300 transition cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

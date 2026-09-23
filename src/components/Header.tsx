@@ -8,7 +8,6 @@ import {
   Radio,
   Sun,
   Moon,
-  Settings,
   LogIn,
   LogOut,
   UserCheck,
@@ -138,17 +137,10 @@ export const Header: React.FC<Props> = ({
             <span>{t.lockAlertNav}</span>
           </button>
 
-          {/* Master Admin Panel & AdSense Engine */}
-          {onOpenAdminPanel && (
-            <button
-              onClick={onOpenAdminPanel}
-              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-cyan-500 hover:opacity-90 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-              title="Open Master Admin Panel (View users, insert Google AdSense & embed ads)"
-            >
-              <Settings className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Admin & Ads</span>
-            </button>
-          )}
+          {/* Master Admin Panel & AdSense Engine — intentionally NOT rendered here.
+              The Super Admin panel is only reachable via its own direct link
+              (?admin, /admin, or #admin), never as a visible button on the
+              regular user/admin pages. See App.tsx's deep-link check. */}
         </div>
 
         {/* Right Section: Theme Switcher, Language Dropdown, PWA */}
