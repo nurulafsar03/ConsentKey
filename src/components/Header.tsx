@@ -12,6 +12,7 @@ import {
   LogOut,
   UserCheck,
   HelpCircle,
+  Settings,
 } from 'lucide-react';
 import { Language, SUPPORTED_LANGUAGES, TranslationDict } from '../i18n/translations';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -36,6 +37,10 @@ interface Props {
   onOpenAdminPanel?: () => void;
   onOpenP2PTransfer?: (initialMode?: 'send' | 'receive') => void;
   onOpenInfoModal?: (tab?: InfoModalTab) => void;
+  // True only for a verified Super Admin session (logged in via the
+  // dedicated /admin magic-link, not just a regular admin/member login).
+  // The "Admin & Ads" button only ever renders when this is true.
+  isSuperAdminAuthed?: boolean;
   t: TranslationDict;
 }
 
@@ -55,6 +60,7 @@ export const Header: React.FC<Props> = ({
   onOpenAdminPanel,
   onOpenP2PTransfer,
   onOpenInfoModal,
+  isSuperAdminAuthed = false,
   t,
 }) => {
   const { theme, toggleTheme, isDark } = useTheme();
@@ -137,10 +143,22 @@ export const Header: React.FC<Props> = ({
             <span>{t.lockAlertNav}</span>
           </button>
 
-          {/* Master Admin Panel & AdSense Engine — intentionally NOT rendered here.
-              The Super Admin panel is only reachable via its own direct link
-              (?admin, /admin, or #admin), never as a visible button on the
-              regular user/admin pages. See App.tsx's deep-link check. */}
+          {/* Master Admin Panel & AdSense Engine — only ever rendered once a
+              verified Super Admin session exists (i.e. after logging in via
+              the dedicated /admin magic link). It never appears for a
+              regular admin/member login. See App.tsx's deep-link check +
+              AdminPanelModal's onAuthChange. */}
+          {isSuperAdminAuthed && onOpenAdminPanel && (
+            <button
+              id="btn-header-super-admin-panel"
+              onClick={onOpenAdminPanel}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap active:scale-98 bg-gradient-to-r from-amber-400 to-cyan-400 hover:from-amber-300 hover:to-cyan-300 text-slate-950 border-amber-300"
+              title="Super Admin & Ads Control Panel"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Admin & Ads</span>
+            </button>
+          )}
         </div>
 
         {/* Right Section: Theme Switcher, Language Dropdown, PWA */}

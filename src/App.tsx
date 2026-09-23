@@ -243,6 +243,10 @@ export default function App() {
 
   // Master Admin & AdSense Campaigns State
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  // Only true once AdminPanelModal has confirmed a real Super Admin session
+  // (its onAuthChange callback) — drives the header's "Admin & Ads" button,
+  // which must stay hidden for every other login.
+  const [isSuperAdminAuthed, setIsSuperAdminAuthed] = useState(false);
   const [adCampaigns, setAdCampaigns] = useState<AdCampaign[]>(() => StorageService.getAdCampaigns());
 
   const handleSaveAdCampaigns = (updated: AdCampaign[]) => {
@@ -690,6 +694,7 @@ export default function App() {
         }}
         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
         onOpenInfoModal={handleOpenInfoModal}
+        isSuperAdminAuthed={isSuperAdminAuthed}
         t={t}
       />
 
@@ -1118,6 +1123,7 @@ export default function App() {
         onSaveCampaigns={handleSaveAdCampaigns}
         isDark={isDark}
         t={t}
+        onAuthChange={setIsSuperAdminAuthed}
       />
 
       {/* Direct P2P File Transfer Modal (No upload required, 6-digit code) */}
