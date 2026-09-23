@@ -46,6 +46,15 @@ export default defineConfig(() => {
         devOptions: {
           enabled: false,
         },
+        workbox: {
+          // Never let the service worker's SPA "navigate fallback" swallow
+          // full-page navigations to our backend routes (e.g. the magic-link
+          // verify link a user clicks from their email: /api/admin/verify,
+          // /api/verify). Without this, the SW serves the cached app shell
+          // instead of letting the request reach the Worker, so redirects
+          // like /admin?authed=1 never happen.
+          navigateFallbackDenylist: [/^\/api\//],
+        },
       }),
     ],
     resolve: {
