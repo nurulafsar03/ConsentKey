@@ -53,6 +53,10 @@ interface Props {
   onSaveCampaigns: (campaigns: AdCampaign[]) => void;
   isDark?: boolean;
   t: TranslationDict;
+  // Fires whenever the Super Admin auth check resolves, so the parent app
+  // can show/hide super-admin-only UI (like the header's "Admin & Ads"
+  // button) without duplicating the session check.
+  onAuthChange?: (authed: boolean) => void;
 }
 
 export const AdminPanelModal: React.FC<Props> = ({
@@ -64,6 +68,7 @@ export const AdminPanelModal: React.FC<Props> = ({
   onSaveCampaigns,
   isDark = true,
   t,
+  onAuthChange,
 }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'creative_studio' | 'ads' | 'new_ad'>('creative_studio');
   const [campaignList, setCampaignList] = useState<AdCampaign[]>(initialCampaigns);
@@ -95,10 +100,12 @@ export const AdminPanelModal: React.FC<Props> = ({
       const res = await fetch('/api/admin/members');
       if (res.status === 401) {
         setIsAdminAuthed(false);
+        onAuthChange?.(false);
         return;
       }
       if (!res.ok) throw new Error('Failed to load users');
       setIsAdminAuthed(true);
+      onAuthChange?.(true);
       const data = await res.json();
       setAdminMembers(Array.isArray(data) ? data : []);
     } catch (err: any) {
