@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   ShieldCheck,
   Radio,
@@ -175,6 +175,30 @@ export default function App() {
     }
     return !StorageService.getRegisteredUser();
   });
+
+  // Rooms/circles visible to the CURRENTLY logged-in real user only.
+  //
+  // `groups` (and `members`) are cached in this browser's local storage and
+  // accumulate every circle ever created or joined here, across every real
+  // account someone has logged into on this device — the storage layer has
+  // no concept of "whose browser session is this". Left unfiltered, the
+  // Room Folder dropdown showed every locally-cached circle to whichever
+  // real user happened to be logged in, including circles that belong to a
+  // completely different account. This scopes the folder down to only the
+  // circles the signed-in user actually administers or is a member of.
+  const visibleGroups = useMemo(() => {
+    if (!registeredUser?.email) return groups;
+    const myEmail = registeredUser.email.trim().toLowerCase();
+    const myMemberGroupIds = new Set(
+      members
+        .filter((m) => (m.email || '').trim().toLowerCase() === myEmail)
+        .map((m) => m.groupId)
+    );
+    return groups.filter(
+      (g) =>
+        (g.adminEmail || '').trim().toLowerCase() === myEmail || myMemberGroupIds.has(g.id)
+    );
+  }, [groups, members, registeredUser]);
 
   // Separate Member Tracking Page View State
   const [selectedMemberForTracking, setSelectedMemberForTracking] = useState<Member | null>(null);
@@ -800,7 +824,7 @@ export default function App() {
                 {/* Admin Mode Controls: Dropdown Folder & Create Room */}
                 <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <GroupFolderDropdown
-                    groups={groups}
+                    groups={visibleGroups}
                     currentGroup={currentGroup}
                     onSelectGroup={handleSelectGroup}
                     onOpenCreateGroup={() => setIsCreateGroupModalOpen(true)}
