@@ -158,10 +158,23 @@ export default function App() {
     return [];
   });
 
-  // Registration Modal State (Opens if no registered real profile is detected)
-  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState<boolean>(
-    () => !StorageService.getRegisteredUser()
-  );
+  // Registration Modal State (Opens if no registered real profile is detected).
+  // Never auto-open this on the Super Admin route (?admin, /admin, #admin) —
+  // on a fresh browser (e.g. Incognito, no saved profile in local storage)
+  // this used to pop up in front of the Super Admin login gate, since both
+  // wanted to open at the same time. The Super Admin panel must be the only
+  // thing offered on that route.
+  const [isRegistrationModalOpen, setIsRegistrationModalOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const isSuperAdminRoute =
+        params.get('admin') !== null ||
+        window.location.pathname === '/admin' ||
+        window.location.hash === '#admin';
+      if (isSuperAdminRoute) return false;
+    }
+    return !StorageService.getRegisteredUser();
+  });
 
   // Separate Member Tracking Page View State
   const [selectedMemberForTracking, setSelectedMemberForTracking] = useState<Member | null>(null);
