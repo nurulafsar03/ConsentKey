@@ -67,6 +67,8 @@ app.post('/api/register', async (c) => {
     });
 
     // Fire off the real magic-link verification email (best effort — never blocks registration).
+    let emailSent = false;
+    let emailError: string | undefined;
     if (c.env.RESEND_API_KEY) {
       try {
         const token = await createMagicLink(c.env.DB, result.user.id, result.user.email);
@@ -81,17 +83,26 @@ app.post('/api/register', async (c) => {
           magicLink,
           circleName: result.group.name,
         });
+        emailSent = emailResult.ok;
         if (!emailResult.ok) {
+          emailError = emailResult.error;
           console.warn('Magic link email failed to send:', emailResult.error);
         }
       } catch (emailErr: any) {
+        emailError = emailErr?.message;
         console.warn('Magic link email failed to send:', emailErr?.message);
       }
     } else {
+      emailError = 'RESEND_API_KEY not set';
       console.warn('RESEND_API_KEY not set — skipping magic link email.');
     }
 
-    return c.json(result);
+    // Let the client know whether the email actually went out, so a real
+    // delivery failure (e.g. Resend's shared onboarding@resend.dev sender
+    // only delivers to the account owner's own address, not arbitrary
+    // registrants — a verified custom domain is needed for that) is visible
+    // instead of silently leaving the user stuck on the waiting screen.
+    return c.json({ ...result, emailSent, emailError: emailSent ? undefined : emailError });
   } catch (err: any) {
     console.error('Registration failed:', err);
     return c.json({ error: err?.message || 'Failed to complete registration' }, 500);
@@ -147,7 +158,7 @@ app.post('/api/resend-verification', async (c) => {
     const token = await createMagicLink(c.env.DB, user.id, user.email);
     const siteUrl = c.env.PUBLIC_SITE_URL || new URL(c.req.url).origin;
     const magicLink = `${siteUrl}/api/verify?token=${token}`;
-    await sendMagicLinkEmail({
+    const emailResult = await sendMagicLinkEmail({
       apiKey: c.env.RESEND_API_KEY,
       fromEmail: c.env.MAGIC_LINK_FROM_EMAIL || 'ConsentKey <onboarding@resend.dev>',
       toEmail: user.email,
@@ -155,6 +166,10 @@ app.post('/api/resend-verification', async (c) => {
       magicLink,
       circleName: 'ConsentKey',
     });
+    if (!emailResult.ok) {
+      console.warn('Resend-verification email failed to send:', emailResult.error);
+      return c.json({ ok: false, error: emailResult.error });
+    }
     return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err?.message }, 500);

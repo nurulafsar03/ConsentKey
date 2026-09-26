@@ -24,6 +24,7 @@ const KEYS = {
   ACTIVE_GROUP: 'safeloc_active_group',
   SAVED_GROUPS: 'safeloc_saved_groups',
   REGISTERED_USER: 'consentkey_user_profile',
+  PENDING_VERIFICATION: 'consentkey_pending_verification',
   MEMBERS: 'safeloc_real_members',
   CONSENT: 'safeloc_member_consent',
   AD_CAMPAIGNS: 'safeloc_ad_campaigns_master',
@@ -386,6 +387,42 @@ export class StorageService {
   static clearRegisteredUser(): void {
     try {
       localStorage.removeItem(KEYS.REGISTERED_USER);
+    } catch {}
+  }
+
+  /**
+   * Get an in-progress registration that is still waiting on email
+   * verification. This is DELIBERATELY separate from getRegisteredUser() —
+   * an entry here must never be treated as "logged in". It only exists so
+   * that refreshing the page while the "Verify Your Email" screen is up
+   * re-shows that same waiting screen instead of losing the form data,
+   * WITHOUT granting access to the app.
+   */
+  static getPendingVerification(): { user: { id: string; name: string; email: string; role: UserRole }; group: Group; member: Member } | null {
+    try {
+      const raw = localStorage.getItem(KEYS.PENDING_VERIFICATION);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Save an in-progress, not-yet-verified registration.
+   */
+  static savePendingVerification(data: { user: { id: string; name: string; email: string; role: UserRole }; group: Group; member: Member }): void {
+    try {
+      localStorage.setItem(KEYS.PENDING_VERIFICATION, JSON.stringify(data));
+    } catch {}
+  }
+
+  /**
+   * Clear the in-progress registration (either because it was verified and
+   * promoted to a real registered user, or because it was cancelled).
+   */
+  static clearPendingVerification(): void {
+    try {
+      localStorage.removeItem(KEYS.PENDING_VERIFICATION);
     } catch {}
   }
 

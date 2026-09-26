@@ -31,13 +31,17 @@ export const UserRegistrationModal: React.FC<Props> = ({
 
   // Set only when a real, unverified ADMIN account was just created — the
   // app stays locked out of that account until the magic link is clicked.
+  // Restored from localStorage on mount (see StorageService.getPendingVerification)
+  // so a page refresh keeps showing this waiting screen instead of silently
+  // granting access — that localStorage entry is NEVER treated as "logged in".
   const [pendingVerification, setPendingVerification] = useState<null | {
     user: { id: string; name: string; email: string; role: UserRole };
     group: Group;
     member: Member;
-  }>(null);
+  }>(() => StorageService.getPendingVerification());
   const [isResending, setIsResending] = useState(false);
   const [resendSent, setResendSent] = useState(false);
+  const [emailSendWarning, setEmailSendWarning] = useState<string | null>(null);
 
   // Poll the backend every few seconds — the moment the user clicks the
   // link in their inbox (any tab, any device), this unlocks automatically.
@@ -52,7 +56,20 @@ export const UserRegistrationModal: React.FC<Props> = ({
           if (data.emailVerified) {
             clearInterval(interval);
             const { user, group, member } = pendingVerification;
-            onRegistered(user, group, member);
+            const verifiedUser = { ...user, emailVerified: true };
+            // Only NOW — after the magic link has actually been clicked —
+            // does this device get treated as logged in.
+            StorageService.saveRegisteredUser(verifiedUser);
+            const existingGroups = StorageService.getSavedGroups();
+            if (!existingGroups.some((g) => g.id === group.id)) {
+              StorageService.saveGroups([...existingGroups, group]);
+            }
+            const existingMembers = StorageService.getSavedMembers();
+            if (!existingMembers.some((m) => m.id === member.id)) {
+              StorageService.saveMembers([...existingMembers, member]);
+            }
+            StorageService.clearPendingVerification();
+            onRegistered(verifiedUser, group, member);
             if (onClose) onClose();
           }
         }
@@ -67,14 +84,23 @@ export const UserRegistrationModal: React.FC<Props> = ({
     if (!pendingVerification) return;
     setIsResending(true);
     setResendSent(false);
+    setEmailSendWarning(null);
     try {
-      await fetch('/api/resend-verification', {
+      const res = await fetch('/api/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: pendingVerification.user.email }),
       });
+      const data = await res.json().catch(() => ({}) as any);
+      if (data && data.ok === false) {
+        setEmailSendWarning(
+          data.error?.includes('Resend API error')
+            ? "The verification email couldn't be delivered by our email service. This usually means the sending domain isn't verified for real recipients yet — please contact support."
+            : 'The verification email could not be sent. Please try again shortly.'
+        );
+      }
     } catch {
-      // best effort
+      setEmailSendWarning('Could not reach the server to resend the email. Check your connection and try again.');
     } finally {
       setIsResending(false);
       setResendSent(true);
@@ -103,6 +129,12 @@ export const UserRegistrationModal: React.FC<Props> = ({
             <span>Waiting for verification…</span>
           </div>
 
+          {emailSendWarning && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-[11px] font-medium text-left">
+              {emailSendWarning}
+            </div>
+          )}
+
           <button
             type="button"
             onClick={handleResend}
@@ -120,6 +152,7 @@ export const UserRegistrationModal: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => {
+                StorageService.clearPendingVerification();
                 setPendingVerification(null);
                 onClose();
               }}
@@ -180,25 +213,38 @@ export const UserRegistrationModal: React.FC<Props> = ({
         throw new Error(data.error || 'Registration failed');
       }
 
-      const { user, group, member } = await res.json();
-
-      // Persist locally
-      StorageService.saveRegisteredUser(user);
-      const existingGroups = StorageService.getSavedGroups();
-      if (!existingGroups.some((g) => g.id === group.id)) {
-        StorageService.saveGroups([...existingGroups, group]);
-      }
-      const existingMembers = StorageService.getSavedMembers();
-      if (!existingMembers.some((m) => m.id === member.id)) {
-        StorageService.saveMembers([...existingMembers, member]);
+      const { user, group, member, emailSent, emailError } = await res.json();
+      if (emailSent === false) {
+        console.warn('Verification email failed to send at registration time:', emailError);
+        setEmailSendWarning(
+          emailError?.includes('Resend API error')
+            ? "We couldn't deliver the verification email. This usually means our email sending domain isn't verified for real recipients yet — please contact support."
+            : 'The verification email could not be sent right now. Use "Resend Verification Email" below in a moment, or contact support if it keeps failing.'
+        );
       }
 
       // Circle admins must verify their email before the app unlocks. A
       // returning admin who already verified previously skips straight in.
       const needsVerification = member.role === 'admin' && !user.emailVerified;
+
       if (needsVerification) {
+        // IMPORTANT: do NOT persist to the "registered user" storage yet.
+        // Doing so before the magic link is clicked is what let a page
+        // refresh treat this device as logged in with no verification ever
+        // having happened. Instead, stash it separately so the waiting
+        // screen can be restored on refresh without granting access.
+        StorageService.savePendingVerification({ user, group, member });
         setPendingVerification({ user, group, member });
       } else {
+        StorageService.saveRegisteredUser(user);
+        const existingGroups = StorageService.getSavedGroups();
+        if (!existingGroups.some((g) => g.id === group.id)) {
+          StorageService.saveGroups([...existingGroups, group]);
+        }
+        const existingMembers = StorageService.getSavedMembers();
+        if (!existingMembers.some((m) => m.id === member.id)) {
+          StorageService.saveMembers([...existingMembers, member]);
+        }
         onRegistered(user, group, member);
         if (onClose) onClose();
       }
