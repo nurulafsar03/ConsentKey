@@ -347,9 +347,24 @@ export const GroupJoinModal: React.FC<Props> = ({
           </div>
         )}
 
-        {/* TAB 2: JOIN & "I AGREE" AUTO-DOWNLOAD EXPERIENCE */}
+        {/* TAB 2: JOIN & "I AGREE" AUTO-DOWNLOAD EXPERIENCE
+            This tab is only ever reached from the "Test Join" preview button
+            below the invite QR/link — it is a same-device PREVIEW of what a
+            new member sees, not a real join. Someone actually joining via
+            the QR code or invite link is sent straight to the real
+            registration form (pre-filled with this circle's invite code),
+            which is what actually creates them as a member on the server. */}
         {activeTab === 'join' && (
           <div className="mt-4 space-y-4">
+            <div className={`p-3 rounded-2xl border text-xs flex items-start gap-2.5 ${
+              isDark ? 'bg-cyan-950/40 border-cyan-800/60 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-900'
+            }`}>
+              <Sparkles className="w-4 h-4 text-cyan-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <strong>Preview only.</strong> This shows what someone sees right before joining — it does not add a real member. Someone actually scanning your QR code or opening your invite link registers for real and is added as a Member automatically.
+              </div>
+            </div>
+
             {/* Download Success Banner when triggered */}
             {downloadSuccessToast && (
               <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 flex items-center gap-3 text-xs text-emerald-800 dark:text-emerald-300 animate-in fade-in slide-in-from-top-2 shadow-xs">

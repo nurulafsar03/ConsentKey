@@ -119,10 +119,10 @@ export const AdminMembersList: React.FC<Props> = ({
                   ? 'bg-cyan-950/60 hover:bg-cyan-900/60 border-cyan-800 text-cyan-300'
                   : 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200 text-cyan-800'
               }`}
-              title="Add a person directly to this room"
+              title="Demo/preview only — adds a fictional member with sample data to this room on THIS device, for testing the map and member list. It does not invite or notify a real person; use Invite for that."
             >
               <UserPlus className="w-3.5 h-3.5 text-cyan-500" />
-              <span>+ Add Person</span>
+              <span>+ Add Person (Demo)</span>
             </button>
           )}
         </div>

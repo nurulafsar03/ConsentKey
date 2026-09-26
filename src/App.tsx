@@ -172,8 +172,31 @@ export default function App() {
         window.location.pathname === '/admin' ||
         window.location.hash === '#admin';
       if (isSuperAdminRoute) return false;
+      // Opening a real invite link (?join=CODE) always opens the real
+      // registration form pre-filled with that code, so the person actually
+      // registers on the backend as a member of THIS circle — see
+      // joinInviteCode below for why this replaced the old GroupJoinModal
+      // "Test Join" simulation, which never called the server at all.
+      if (params.get('join')) return true;
     }
     return !StorageService.getRegisteredUser();
+  });
+
+  // Invite code carried in the URL (?join=CODE) from a real invite link or
+  // QR code. Passed to UserRegistrationModal so the "Join Existing Circle"
+  // tab is pre-filled and submits a REAL /api/register call — this is what
+  // actually creates the visitor as a role:'member' row in the database.
+  // (The old flow opened GroupJoinModal's "join" tab instead, whose "I
+  // Agree" button never touched the backend — it just flipped location
+  // sharing on for whoever was already the "current member" in that
+  // browser, which defaults to role 'admin' on a brand-new device with no
+  // registered user yet. That's why joining via the invite link or QR code
+  // made the other side show up as an Admin instead of a Member.)
+  const [joinInviteCode] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return new URLSearchParams(window.location.search).get('join') || '';
+    }
+    return '';
   });
 
   // Rooms/circles visible to the CURRENTLY logged-in real user only.
@@ -327,8 +350,10 @@ export default function App() {
       setIsAdminPanelOpen(true);
     }
     if (params.get('join')) {
-      setJoinModalInitialMode('join');
-      setIsJoinModalOpen(true);
+      // Real registration modal (join tab, pre-filled) already opened via
+      // isRegistrationModalOpen's initializer above — nothing else to do
+      // here. (Previously this opened GroupJoinModal's demo "join" tab
+      // instead, which never actually registered the visitor.)
     }
     if (params.get('magic_token')) {
       setUserEmail('admin@family.org');
@@ -1250,6 +1275,7 @@ export default function App() {
         onClose={() => setIsRegistrationModalOpen(false)}
         onRegistered={handleUserRegistered}
         isInitialRequired={!registeredUser}
+        defaultInviteCode={joinInviteCode}
       />
 
       {/* Floating Bottom Bar Ad Slot */}
