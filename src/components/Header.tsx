@@ -26,6 +26,12 @@ interface Props {
   onSelectLanguage: (lang: Language) => void;
   currentRole: UserRole;
   onChangeRole: (role: UserRole) => void;
+  // The signed-in person's actual registered/joined role (from registration
+  // or an invite/join link) — distinct from currentRole, which is only
+  // which page they're currently viewing. Used to lock the "Admin" pill for
+  // anyone who isn't really the circle admin, so a member can no longer
+  // grant themselves the admin dashboard just by clicking it.
+  realRole?: UserRole;
   userEmail?: string | null;
   userName?: string | null;
   onOpenMagicLink?: () => void;
@@ -49,6 +55,7 @@ export const Header: React.FC<Props> = ({
   onSelectLanguage,
   currentRole,
   onChangeRole,
+  realRole,
   userEmail,
   userName,
   onOpenMagicLink,
@@ -67,6 +74,11 @@ export const Header: React.FC<Props> = ({
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
 
   const activeLangObj = SUPPORTED_LANGUAGES.find((l) => l.code === currentLanguage) || SUPPORTED_LANGUAGES[0];
+
+  // Only lock the Admin pill once we actually know this person joined as a
+  // member (realRole undefined means "not yet registered" — leave it open
+  // rather than guessing).
+  const isLockedMember = realRole === 'member';
 
   return (
     <header className={`sticky top-0 z-40 w-full border-b backdrop-blur-xl transition-colors shadow-xs ${
@@ -101,9 +113,15 @@ export const Header: React.FC<Props> = ({
           }`}>
             <button
               id="header-role-admin"
-              onClick={() => onChangeRole('admin')}
-              className={`px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-bold rounded-lg transition cursor-pointer ${
-                currentRole === 'admin'
+              onClick={() => !isLockedMember && onChangeRole('admin')}
+              disabled={isLockedMember}
+              title={isLockedMember ? 'Only the circle admin can open Admin Mode' : undefined}
+              className={`px-2 sm:px-3 py-1 text-[11px] sm:text-xs font-bold rounded-lg transition flex items-center gap-1 ${
+                isLockedMember
+                  ? 'opacity-40 cursor-not-allowed text-slate-500'
+                  : 'cursor-pointer'
+              } ${
+                currentRole === 'admin' && !isLockedMember
                   ? 'bg-emerald-600 text-white shadow-xs'
                   : isDark
                   ? 'text-slate-400 hover:text-white'

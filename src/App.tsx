@@ -582,6 +582,22 @@ export default function App() {
     }
   };
 
+  // Gate for the Admin/Member view toggle. currentRole used to be a bare
+  // setState anyone could flip from the header pill or the in-page "Switch
+  // to Admin" button — so a real MEMBER (added via invite/join link) could
+  // give themselves the full Admin dashboard (invite others, see the whole
+  // member list, create rooms) just by clicking "Admin", with nothing in
+  // the UI to say who actually administers the circle. Only someone whose
+  // own registered/joined role is 'admin' may switch into Admin Mode;
+  // switching to Member Mode (a preview, not a privilege) stays open to
+  // everyone, including the real admin previewing the member experience.
+  const handleChangeRole = (role: UserRole) => {
+    if (role === 'admin' && registeredUser?.role !== 'admin') {
+      return;
+    }
+    setCurrentRole(role);
+  };
+
   const handleLogout = () => {
     StorageService.clearRegisteredUser();
     setRegisteredUser(null);
@@ -745,7 +761,8 @@ export default function App() {
         currentLanguage={language}
         onSelectLanguage={setLanguage}
         currentRole={currentRole}
-        onChangeRole={setCurrentRole}
+        onChangeRole={handleChangeRole}
+        realRole={registeredUser?.role}
         userEmail={userEmail}
         userName={userName}
         onOpenMagicLink={() => setIsMagicLinkModalOpen(true)}
@@ -863,10 +880,13 @@ export default function App() {
                     memberCountsByGroupId={memberCountsByGroupId}
                   />
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
+                    <span className={`hidden sm:inline text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      You are the <span className="text-emerald-500">Admin</span> of {currentGroup.name}
+                    </span>
                     <button
                       id="btn-switch-to-member"
-                      onClick={() => setCurrentRole('member')}
+                      onClick={() => handleChangeRole('member')}
                       className={`px-3.5 py-2.5 rounded-2xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
                         isDark
                           ? 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'
@@ -982,23 +1002,35 @@ export default function App() {
                 <div className="flex items-center justify-between pb-2">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <h2 className={`text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                      Member Field Portal
-                    </h2>
+                    <div>
+                      <h2 className={`text-lg font-black leading-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                        Member Field Portal
+                      </h2>
+                      {/* Makes explicit whose circle this is and who the admin
+                          is — the toggle alone gave no way to tell members
+                          and admins apart. */}
+                      <p className={`text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        You are a <span className="text-cyan-500">Member</span> of {currentGroup.adminName}'s circle ({currentGroup.name})
+                      </p>
+                    </div>
                   </div>
 
-                  <button
-                    id="btn-switch-to-admin"
-                    onClick={() => setCurrentRole('admin')}
-                    className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
-                      isDark
-                        ? 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'
-                        : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
-                    <span>{t.switchToAdmin}</span>
-                  </button>
+                  {/* Only the real circle admin can switch back into Admin
+                      Mode — a joined member has nothing to switch to. */}
+                  {registeredUser?.role === 'admin' && (
+                    <button
+                      id="btn-switch-to-admin"
+                      onClick={() => handleChangeRole('admin')}
+                      className={`px-3.5 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
+                        isDark
+                          ? 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-200'
+                          : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-700'
+                      }`}
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>{t.switchToAdmin}</span>
+                    </button>
+                  )}
                 </div>
 
                 <MemberPortalView
