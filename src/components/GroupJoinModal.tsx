@@ -2,25 +2,16 @@ import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import {
   ShieldCheck,
-  UserCheck,
-  EyeOff,
-  Lock,
   X,
   Check,
   Copy,
   Share2,
-  Download,
-  Smartphone,
   Sparkles,
-  QrCode as QrCodeIcon,
   MessageCircle,
-  CheckCircle2,
-  ArrowRight,
 } from 'lucide-react';
 import { Group } from '../types';
 import { TranslationDict } from '../i18n/translations';
 import { audioService } from '../services/audio';
-import { usePWAInstall } from '../hooks/usePWAInstall';
 import { useTheme } from '../context/ThemeContext';
 import { getPublicAppBaseUrl } from '../utils/url';
 import { copyToClipboard } from '../utils/clipboard';
@@ -29,28 +20,21 @@ interface Props {
   group: Group;
   isOpen: boolean;
   onClose: () => void;
-  onAgreeToJoin: () => void;
   t: TranslationDict;
-  initialMode?: 'invite' | 'join';
 }
 
-export const GroupJoinModal: React.FC<Props> = ({
-  group,
-  isOpen,
-  onClose,
-  onAgreeToJoin,
-  t,
-  initialMode,
-}) => {
+// Invite modal: shows the real QR code and joining link for this circle.
+// Anyone scanning the code or opening the link is sent to the real
+// registration form (pre-filled with this circle's invite code), which
+// actually registers them on the server as a Member — see App.tsx's
+// joinInviteCode handling. This modal used to also have a "Test Join" tab
+// that simulated what a joiner sees without ever calling the backend; it
+// was removed since it was demo-only clutter and could confuse people
+// into thinking they'd added a real member.
+export const GroupJoinModal: React.FC<Props> = ({ group, isOpen, onClose, t }) => {
   const { isDark } = useTheme();
-  const [activeTab, setActiveTab] = useState<'invite' | 'join'>('invite');
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
-  const [downloadSuccessToast, setDownloadSuccessToast] = useState<string | null>(null);
-  const [isProcessingAgree, setIsProcessingAgree] = useState<boolean>(false);
-  const [showIOSHint, setShowIOSHint] = useState<boolean>(false);
-
-  const { triggerAutoMemberInstall } = usePWAInstall();
 
   const publicBaseUrl = getPublicAppBaseUrl();
   const inviteUrl = `${publicBaseUrl}/?join=${group.inviteCode}`;
@@ -68,21 +52,6 @@ export const GroupJoinModal: React.FC<Props> = ({
       .then(setQrCodeDataUrl)
       .catch(() => {});
   }, [inviteUrl]);
-
-  useEffect(() => {
-    if (isOpen) {
-      // If URL has ?join= or initialMode is 'join', show the joining consent screen
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('join') || initialMode === 'join') {
-        setActiveTab('join');
-      } else {
-        setActiveTab('invite');
-      }
-      setDownloadSuccessToast(null);
-      setIsProcessingAgree(false);
-      setShowIOSHint(false);
-    }
-  }, [isOpen, initialMode]);
 
   if (!isOpen) return null;
 
@@ -118,34 +87,6 @@ export const GroupJoinModal: React.FC<Props> = ({
     window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
   };
 
-  // Triggered when someone connects via QR code or link and presses "I Agree"
-  const handleAgreeAndAutoDownload = async () => {
-    setIsProcessingAgree(true);
-    audioService.playConsentChime();
-
-    try {
-      // 1. Automatically initiate WebApp download / native install without needing to press an install button
-      const result = await triggerAutoMemberInstall();
-
-      if (result.method === 'native_prompt') {
-        setDownloadSuccessToast('📱 Web App install prompt opened! App is being added to your device.');
-      } else if (result.method === 'auto_download') {
-        setDownloadSuccessToast('📥 Web App package downloaded automatically to your device! Offline launcher ready.');
-      } else if (result.method === 'ios_guide') {
-        setShowIOSHint(true);
-        setDownloadSuccessToast('📲 ConsentKey cached for offline use! Follow the 1-tap Home Screen step.');
-      }
-    } catch {
-      setDownloadSuccessToast('✅ Web App cached locally and ready on your device!');
-    }
-
-    // Complete joining workflow and activate sharing
-    setTimeout(() => {
-      setIsProcessingAgree(false);
-      onAgreeToJoin();
-    }, 1800);
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto animate-in fade-in">
       <div className={`relative w-full max-w-xl rounded-3xl border p-5 sm:p-7 shadow-2xl max-h-[94vh] overflow-y-auto transition ${
@@ -174,38 +115,8 @@ export const GroupJoinModal: React.FC<Props> = ({
           </button>
         </div>
 
-        {/* Tab Switcher: Invite (QR & Link) vs Join Consent Screen */}
-        <div className={`mt-4 flex items-center p-1 rounded-2xl border text-xs font-semibold ${
-          isDark ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'
-        }`}>
-          <button
-            onClick={() => setActiveTab('invite')}
-            className={`flex-1 py-2 px-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-              activeTab === 'invite'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <QrCodeIcon className="w-3.5 h-3.5" />
-            <span>{t.tabInvite}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('join')}
-            className={`flex-1 py-2 px-3 rounded-xl transition cursor-pointer flex items-center justify-center gap-2 ${
-              activeTab === 'join'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            <span>{t.tabJoin}</span>
-          </button>
-        </div>
-
-        {/* TAB 1: INVITE VIA QR CODE AND JOINING LINK */}
-        {activeTab === 'invite' && (
-          <div className="mt-4 space-y-4">
+        {/* INVITE VIA QR CODE AND JOINING LINK */}
+        <div className="mt-4 space-y-4">
             {/* Automatic Download Notice Badge */}
             <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-start gap-2.5 text-xs text-emerald-800">
               <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
@@ -318,173 +229,7 @@ export const GroupJoinModal: React.FC<Props> = ({
               </div>
             </div>
 
-            {/* How to activate for external mobile phones hint */}
-            <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 transition ${
-              isDark
-                ? 'bg-amber-950/40 border-amber-800/60 text-amber-300'
-                : 'bg-amber-50 border-amber-200 text-amber-900'
-            }`}>
-              <Sparkles className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="font-bold">Opening on an external phone:</span> To open this link on your mobile, click the <strong>"Share"</strong> button in the top-right corner of Google AI Studio to publish the live URL.
-                <div className="mt-1">
-                  You can also test the Member mobile experience right on your screen by clicking <strong>"{t.testJoinBtn}"</strong> below!
-                </div>
-              </div>
-            </div>
-
-            {/* Test Recipient View Button */}
-            <div className={`pt-1 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              <span>{t.testJoinPrompt}</span>
-              <button
-                onClick={() => setActiveTab('join')}
-                className="text-emerald-500 hover:text-emerald-400 font-bold flex items-center gap-1 transition cursor-pointer"
-              >
-                <span>{t.testJoinBtn}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
           </div>
-        )}
-
-        {/* TAB 2: JOIN & "I AGREE" AUTO-DOWNLOAD EXPERIENCE
-            This tab is only ever reached from the "Test Join" preview button
-            below the invite QR/link — it is a same-device PREVIEW of what a
-            new member sees, not a real join. Someone actually joining via
-            the QR code or invite link is sent straight to the real
-            registration form (pre-filled with this circle's invite code),
-            which is what actually creates them as a member on the server. */}
-        {activeTab === 'join' && (
-          <div className="mt-4 space-y-4">
-            <div className={`p-3 rounded-2xl border text-xs flex items-start gap-2.5 ${
-              isDark ? 'bg-cyan-950/40 border-cyan-800/60 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-900'
-            }`}>
-              <Sparkles className="w-4 h-4 text-cyan-500 flex-shrink-0 mt-0.5" />
-              <div>
-                <strong>Preview only.</strong> This shows what someone sees right before joining — it does not add a real member. Someone actually scanning your QR code or opening your invite link registers for real and is added as a Member automatically.
-              </div>
-            </div>
-
-            {/* Download Success Banner when triggered */}
-            {downloadSuccessToast && (
-              <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-800 flex items-center gap-3 text-xs text-emerald-800 dark:text-emerald-300 animate-in fade-in slide-in-from-top-2 shadow-xs">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                <div className="font-semibold">{downloadSuccessToast}</div>
-              </div>
-            )}
-
-            {/* iOS Safari Home Screen Helper if relevant */}
-            {showIOSHint && (
-              <div className="p-3.5 rounded-2xl bg-cyan-50 dark:bg-cyan-950/70 border border-cyan-200 dark:border-cyan-800 text-xs text-slate-700 dark:text-slate-200 space-y-2">
-                <div className="flex items-center gap-1.5 font-bold text-cyan-800 dark:text-cyan-400">
-                  <Smartphone className="w-4 h-4" />
-                  <span>iOS Safari Auto-Ready:</span>
-                </div>
-                <p>
-                  To keep ConsentKey on your iPhone Home Screen: tap Safari's <strong>Share</strong> button (⎋), then tap <strong>"Add to Home Screen"</strong> (+).
-                </p>
-              </div>
-            )}
-
-            {/* Group Details Summary */}
-            <div className={`p-4 rounded-2xl border flex items-center justify-between ${
-              isDark ? 'bg-slate-800/80 border-slate-700' : 'bg-slate-50 border-slate-200'
-            }`}>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-500">
-                  {t.connectingToCircle}
-                </span>
-                <h3 className={`text-lg font-extrabold mt-0.5 ${isDark ? 'text-white' : 'text-slate-900'}`}>{group.name}</h3>
-                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {t.circleAdmin}: <span className={`font-semibold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{group.adminName}</span>
-                </p>
-              </div>
-
-              <div className="text-right">
-                <span className="text-[10px] uppercase font-bold text-slate-400">{t.inviteCode}</span>
-                <div className="font-mono text-sm text-emerald-500 font-bold">{group.inviteCode}</div>
-              </div>
-            </div>
-
-            {/* Consent Clauses */}
-            <div className="space-y-2.5">
-              <div className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                isDark ? 'text-slate-300' : 'text-slate-700'
-              }`}>
-                <Sparkles className="w-3.5 h-3.5 text-emerald-500" />
-                <span>{t.zeroKnowledgeTerms}</span>
-              </div>
-
-              <div className={`grid gap-2 text-xs ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                <div className={`flex items-start gap-2.5 p-3 rounded-xl border ${
-                  isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <UserCheck className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong className={isDark ? 'text-white' : 'text-slate-900'}>{t.termAdminOnlyTitle}</strong> {t.termAdminOnlyDesc}
-                  </span>
-                </div>
-
-                <div className={`flex items-start gap-2.5 p-3 rounded-xl border ${
-                  isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <EyeOff className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong className={isDark ? 'text-white' : 'text-slate-900'}>{t.termExplicitSwitchTitle}</strong> {t.termExplicitSwitchDesc}
-                  </span>
-                </div>
-
-                <div className={`flex items-start gap-2.5 p-3 rounded-xl border ${
-                  isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <Lock className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong className={isDark ? 'text-white' : 'text-slate-900'}>{t.term24hPurgeTitle}</strong> {t.term24hPurgeDesc}
-                  </span>
-                </div>
-
-                <div className={`flex items-start gap-2.5 p-3 rounded-xl border ${
-                  isDark ? 'bg-slate-800/60 border-slate-700' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <Download className="w-4 h-4 text-cyan-500 flex-shrink-0 mt-0.5" />
-                  <span>
-                    <strong className={isDark ? 'text-white' : 'text-slate-900'}>{t.termAutoDownloadTitle}</strong> {t.termAutoDownloadDesc}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons: "I Agree" triggers automatic app download */}
-            <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-center gap-3">
-              <button
-                id="btn-agree-join-group"
-                onClick={handleAgreeAndAutoDownload}
-                disabled={isProcessingAgree}
-                className="w-full sm:flex-1 py-3.5 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-sm shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
-              >
-                {isProcessingAgree ? (
-                  <>
-                    <Download className="w-4 h-4 animate-bounce" />
-                    <span>{t.downloadingApp}</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4 stroke-[3]" />
-                    <span>{t.iAgreeToJoin} {t.autoDownloadAppSuffix}</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                id="btn-decline-join-group"
-                onClick={onClose}
-                className="w-full sm:w-auto py-3.5 px-5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer"
-              >
-                {t.decline}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

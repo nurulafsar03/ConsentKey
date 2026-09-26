@@ -375,6 +375,52 @@ export async function deleteMemberCascade(DB: D1Database, memberId: string): Pro
   return { ok: true };
 }
 
+/**
+ * Lets a signed-in person update their own display name from the "My
+ * Circle" screen, and — only if they are the admin of the given circle —
+ * that circle's name/category too. Ownership is checked by requiring BOTH
+ * the userId and the account's own email to match, since this app has no
+ * session tokens for regular users (only Super Admin logins get a real
+ * session) — the same trust level already used by /api/resend-verification.
+ */
+export async function updateOwnProfile(
+  DB: D1Database,
+  params: { userId: string; email: string; name?: string; groupId?: string; groupName?: string; groupCategory?: string }
+): Promise<{ user: RealUser; group?: RealGroup } | undefined> {
+  const email = params.email.trim().toLowerCase();
+  const userRow: any = await DB.prepare(`SELECT * FROM users WHERE id = ? AND email = ?`)
+    .bind(params.userId, email)
+    .first();
+  if (!userRow) return undefined;
+
+  const name = params.name?.trim() || userRow.name;
+  if (name !== userRow.name) {
+    await DB.prepare(`UPDATE users SET name = ? WHERE id = ?`).bind(name, params.userId).run();
+    await DB.prepare(`UPDATE members SET name = ? WHERE user_id = ?`).bind(name, params.userId).run();
+    await DB.prepare(`UPDATE groups SET admin_name = ? WHERE admin_id = ?`).bind(name, params.userId).run();
+  }
+
+  let group: RealGroup | undefined;
+  if (params.groupId) {
+    const groupRow: any = await DB.prepare(`SELECT * FROM groups WHERE id = ?`).bind(params.groupId).first();
+    if (groupRow && groupRow.admin_id === params.userId) {
+      const groupName = params.groupName?.trim() || groupRow.name;
+      const groupCategory = params.groupCategory?.trim() || groupRow.category;
+      await DB.prepare(`UPDATE groups SET name = ?, category = ? WHERE id = ?`)
+        .bind(groupName, groupCategory, params.groupId)
+        .run();
+      group = { ...groupRowToObj(groupRow), name: groupName, category: groupCategory, adminName: name };
+    } else if (groupRow) {
+      // Not the admin of this circle — return it unchanged, just so the
+      // client has the latest admin name/category to display.
+      group = groupRowToObj(groupRow);
+    }
+  }
+
+  const updatedUserRow: any = await DB.prepare(`SELECT * FROM users WHERE id = ?`).bind(params.userId).first();
+  return { user: userRowToObj(updatedUserRow), group };
+}
+
 export async function getGroupByInviteCode(DB: D1Database, code: string): Promise<RealGroup | undefined> {
   const row = await DB.prepare(`SELECT * FROM groups WHERE UPPER(invite_code) = ?`)
     .bind(code.trim().toUpperCase())

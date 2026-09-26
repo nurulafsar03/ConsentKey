@@ -13,6 +13,7 @@ import {
   getUserByEmail,
   getAllMembersForAdmin,
   updateMemberAndUser,
+  updateOwnProfile,
   deleteMemberCascade,
   createAdminSession,
   verifyAdminSession,
@@ -173,6 +174,23 @@ app.post('/api/resend-verification', async (c) => {
     return c.json({ ok: true });
   } catch (err: any) {
     return c.json({ error: err?.message }, 500);
+  }
+});
+
+// ---- "My Circle": lets a signed-in user update their own name, and — if ----
+// ---- they are the circle admin — the circle's name/category too. ----
+app.post('/api/profile/update', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { userId, email, name, groupId, groupName, groupCategory } = body || {};
+    if (!userId || !email) {
+      return c.json({ error: 'userId and email are required' }, 400);
+    }
+    const result = await updateOwnProfile(c.env.DB, { userId, email, name, groupId, groupName, groupCategory });
+    if (!result) return c.json({ error: 'Profile not found or email does not match' }, 404);
+    return c.json(result);
+  } catch (err: any) {
+    return c.json({ error: err?.message || 'Failed to update profile' }, 500);
   }
 });
 

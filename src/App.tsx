@@ -49,7 +49,7 @@ import { SafeZonesModal } from './components/SafeZonesModal';
 import { SosAlertModal } from './components/SosAlertModal';
 import { DirectChatModal } from './components/DirectChatModal';
 import { CreateGroupModal } from './components/CreateGroupModal';
-import { AddMemberModal } from './components/AddMemberModal';
+import { MyCircleModal } from './components/MyCircleModal';
 import { MemberTrackingPage } from './components/MemberTrackingPage';
 import { GroupSelectorBar } from './components/GroupSelectorBar';
 import { GroupFolderDropdown } from './components/GroupFolderDropdown';
@@ -226,9 +226,9 @@ export default function App() {
   // Separate Member Tracking Page View State
   const [selectedMemberForTracking, setSelectedMemberForTracking] = useState<Member | null>(null);
 
-  // Circle / Room Creation and Direct Member Addition Modals
+  // Circle / Room Creation Modal, and "My Circle" (view/edit own profile & circle)
   const [isCreateGroupModalOpen, setIsCreateGroupModalOpen] = useState(false);
-  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [isMyCircleModalOpen, setIsMyCircleModalOpen] = useState(false);
 
   // Current active member ID (scoped to the registered user or first member)
   const currentMemberId = registeredUser ? `mem_${registeredUser.id}` : (members[0]?.id || 'mem_current');
@@ -285,7 +285,6 @@ export default function App() {
 
   // Modals
   const [isJoinModalOpen, setIsJoinModalOpen] = useState(false);
-  const [joinModalInitialMode, setJoinModalInitialMode] = useState<'invite' | 'join'>('invite');
   const [isDirectShareOpen, setIsDirectShareOpen] = useState(false);
   const [isP2PTransferOpen, setIsP2PTransferOpen] = useState(false);
   const [p2pInitialMode, setP2pInitialMode] = useState<'send' | 'receive'>('send');
@@ -569,11 +568,6 @@ export default function App() {
     setMembers((prev) => [...prev, newAdminMember]);
   };
 
-  // Add Member Directly / Randomly to Circle (Admin action)
-  const handleAddMemberDirectly = (newMember: Member) => {
-    setMembers((prev) => [...prev, newMember]);
-  };
-
   // Select Group / Room
   const handleSelectGroup = (group: Group) => {
     setCurrentGroup(group);
@@ -655,6 +649,39 @@ export default function App() {
       return next;
     });
     setIsRegistrationModalOpen(false);
+  };
+
+  // "My Circle" save handler — applies the name/circle edits that just
+  // succeeded on the server (via /api/profile/update) to local state and
+  // localStorage, so the UI reflects the change immediately without a
+  // full reload.
+  const handleProfileSaved = (updates: { name: string; group?: Group }) => {
+    setUserName(updates.name);
+    setRegisteredUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, name: updates.name };
+      StorageService.saveRegisteredUser(next);
+      return next;
+    });
+
+    setMembers((prev) => {
+      const next = prev.map((m) =>
+        m.userId === registeredUser?.id || m.email.toLowerCase() === registeredUser?.email.toLowerCase()
+          ? { ...m, name: updates.name }
+          : m
+      );
+      StorageService.saveMembers(next);
+      return next;
+    });
+
+    if (updates.group) {
+      setGroups((prev) => {
+        const next = prev.map((g) => (g.id === updates.group!.id ? { ...g, ...updates.group } : g));
+        StorageService.saveGroups(next);
+        return next;
+      });
+      setCurrentGroup((prev) => (prev.id === updates.group!.id ? { ...prev, ...updates.group } : prev));
+    }
   };
 
   // Real GPS Geolocation tracking & Server Telemetry Broadcast
@@ -793,16 +820,14 @@ export default function App() {
         onOpenMagicLink={() => setIsMagicLinkModalOpen(true)}
         onLogout={handleLogout}
         onOpenRegistration={() => setIsRegistrationModalOpen(true)}
+        onOpenMyCircle={() => setIsMyCircleModalOpen(true)}
         onOpenDirectShare={() => setIsDirectShareOpen(true)}
         onOpenP2PTransfer={(mode) => {
           setP2pInitialMode(mode || 'send');
           setIsP2PTransferOpen(true);
         }}
         onOpenLockScreenTest={() => setIsLockScreenTestOpen(true)}
-        onOpenJoinModal={() => {
-          setJoinModalInitialMode(currentRole === 'admin' ? 'invite' : 'join');
-          setIsJoinModalOpen(true);
-        }}
+        onOpenJoinModal={() => setIsJoinModalOpen(true)}
         onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
         onOpenInfoModal={handleOpenInfoModal}
         isSuperAdminAuthed={isSuperAdminAuthed}
@@ -848,10 +873,7 @@ export default function App() {
           <TopHeroSection
             t={t}
             onScrollToLiveMap={scrollToWorkspace}
-            onOpenJoinModal={() => {
-              setJoinModalInitialMode('join');
-              setIsJoinModalOpen(true);
-            }}
+            onOpenJoinModal={() => setIsJoinModalOpen(true)}
             onOpenDirectShare={() => setIsDirectShareOpen(true)}
             onOpenP2PTransfer={(mode) => {
               setP2pInitialMode(mode || 'send');
@@ -992,11 +1014,7 @@ export default function App() {
                       safeZones={safeZones}
                       onCallMember={(m, isVideo) => handleInitiateCall(m, isVideo)}
                       onChatMember={(m) => setChatRecipient(m)}
-                      onOpenInvite={() => {
-                        setJoinModalInitialMode('invite');
-                        setIsJoinModalOpen(true);
-                      }}
-                      onOpenAddDirectly={() => setIsAddMemberModalOpen(true)}
+                      onOpenInvite={() => setIsJoinModalOpen(true)}
                       onSelectMember={(m) => {
                         setSelectedMemberForTracking(m);
                         handleGetRoute(m);
@@ -1143,13 +1161,7 @@ export default function App() {
       <GroupJoinModal
         group={currentGroup}
         isOpen={isJoinModalOpen}
-        initialMode={joinModalInitialMode}
         onClose={() => setIsJoinModalOpen(false)}
-        onAgreeToJoin={() => {
-          setIsJoinModalOpen(false);
-          // Mark current member as consent given
-          handleToggleSharing(true);
-        }}
         t={t}
       />
 
@@ -1231,14 +1243,6 @@ export default function App() {
         adminEmail={userEmail || 'admin@family.org'}
       />
 
-      {/* Admin Direct Member Addition Modal */}
-      <AddMemberModal
-        isOpen={isAddMemberModalOpen}
-        onClose={() => setIsAddMemberModalOpen(false)}
-        onAddMember={handleAddMemberDirectly}
-        currentGroup={currentGroup}
-      />
-
       {/* Master Admin Panel & Ad Engine Modal */}
       <AdminPanelModal
         isOpen={isAdminPanelOpen}
@@ -1277,6 +1281,19 @@ export default function App() {
         isInitialRequired={!registeredUser}
         defaultInviteCode={joinInviteCode}
       />
+
+      {/* "My Circle": opens PRE-FILLED with the signed-in user's real
+          profile & circle details, editable and saveable — not the blank
+          registration form. Only rendered once a real profile exists. */}
+      {registeredUser && (
+        <MyCircleModal
+          isOpen={isMyCircleModalOpen}
+          onClose={() => setIsMyCircleModalOpen(false)}
+          user={registeredUser}
+          group={currentGroup}
+          onSaved={handleProfileSaved}
+        />
+      )}
 
       {/* Floating Bottom Bar Ad Slot */}
       <AdSlot placement="bottom_bar" campaigns={adCampaigns} isDark={isDark} />

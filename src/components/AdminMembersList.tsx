@@ -24,7 +24,6 @@ interface Props {
   onCallMember: (member: Member, isVideo?: boolean) => void;
   onChatMember: (member: Member) => void;
   onOpenInvite: () => void;
-  onOpenAddDirectly?: () => void;
   onFocusMember?: (member: Member) => void;
   onGetRoute?: (member: Member) => void;
   onSelectMember?: (member: Member) => void;
@@ -38,7 +37,6 @@ export const AdminMembersList: React.FC<Props> = ({
   onCallMember,
   onChatMember,
   onOpenInvite,
-  onOpenAddDirectly,
   onFocusMember,
   onGetRoute,
   onSelectMember,
@@ -110,21 +108,6 @@ export const AdminMembersList: React.FC<Props> = ({
             <UserPlus className="w-3.5 h-3.5" />
             <span>{t.invite}</span>
           </button>
-
-          {onOpenAddDirectly && (
-            <button
-              onClick={onOpenAddDirectly}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold shadow-xs transition cursor-pointer ${
-                isDark
-                  ? 'bg-cyan-950/60 hover:bg-cyan-900/60 border-cyan-800 text-cyan-300'
-                  : 'bg-cyan-50 hover:bg-cyan-100 border-cyan-200 text-cyan-800'
-              }`}
-              title="Demo/preview only — adds a fictional member with sample data to this room on THIS device, for testing the map and member list. It does not invite or notify a real person; use Invite for that."
-            >
-              <UserPlus className="w-3.5 h-3.5 text-cyan-500" />
-              <span>+ Add Person (Demo)</span>
-            </button>
-          )}
         </div>
       </div>
 
@@ -201,14 +184,6 @@ export const AdminMembersList: React.FC<Props> = ({
               >
                 {t.inviteMember}
               </button>
-              {onOpenAddDirectly && (
-                <button
-                  onClick={onOpenAddDirectly}
-                  className="px-3 py-1.5 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
-                >
-                  Add Direct
-                </button>
-              )}
             </div>
           </div>
         ) : (

@@ -37,6 +37,10 @@ interface Props {
   onOpenMagicLink?: () => void;
   onLogout?: () => void;
   onOpenRegistration?: () => void;
+  // Opens the pre-filled "My Circle" view/edit screen for an already
+  // registered user. Falls back to onOpenRegistration when this isn't
+  // provided or there's no registered profile yet.
+  onOpenMyCircle?: () => void;
   onOpenDirectShare?: () => void;
   onOpenLockScreenTest: () => void;
   onOpenJoinModal?: () => void;
@@ -61,6 +65,7 @@ export const Header: React.FC<Props> = ({
   onOpenMagicLink,
   onLogout,
   onOpenRegistration,
+  onOpenMyCircle,
   onOpenDirectShare,
   onOpenLockScreenTest,
   onOpenJoinModal,
@@ -185,7 +190,7 @@ export const Header: React.FC<Props> = ({
           {onOpenRegistration && (
             <button
               id="btn-header-register-profile"
-              onClick={onOpenRegistration}
+              onClick={userEmail && onOpenMyCircle ? onOpenMyCircle : onOpenRegistration}
               className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-bold transition cursor-pointer shadow-xs whitespace-nowrap active:scale-98 ${
                 userEmail
                   ? isDark
