@@ -704,6 +704,38 @@ export default function App() {
     workspaceRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // The Super Admin route (?admin, /admin, #admin) is its own dedicated
+  // screen — it must never show the regular site's header, Admin/Member
+  // toggle, Register/Admin Login buttons, or "Switch to Member Mode". A
+  // visitor here should see nothing but the Super Admin login gate (and,
+  // once authenticated, the Master Admin & Ad Management panel) — that is
+  // the entire point of keeping this a separate, fixed-email-only entrance.
+  const isSuperAdminRoute =
+    typeof window !== 'undefined' &&
+    (new URLSearchParams(window.location.search).get('admin') !== null ||
+      window.location.pathname === '/admin' ||
+      window.location.hash === '#admin');
+
+  if (isSuperAdminRoute) {
+    return (
+      <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
+        isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-800'
+      }`}>
+        <AdminPanelModal
+          isOpen={isAdminPanelOpen}
+          onClose={() => setIsAdminPanelOpen(false)}
+          members={members}
+          groups={groups}
+          campaigns={adCampaigns}
+          onSaveCampaigns={handleSaveAdCampaigns}
+          isDark={isDark}
+          t={t}
+          onAuthChange={setIsSuperAdminAuthed}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-200 selection:bg-emerald-500/20 ${
       isDark ? 'bg-slate-950 text-slate-100 selection:text-emerald-300' : 'bg-slate-50 text-slate-800 selection:text-emerald-900'
