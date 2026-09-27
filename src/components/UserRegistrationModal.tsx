@@ -20,7 +20,13 @@ export const UserRegistrationModal: React.FC<Props> = ({
 }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [role, setRole] = useState<UserRole>('admin');
+  // Arriving via a real invite link/QR code (?join=CODE) always means
+  // joining as a Member — the backend forces role 'member' for any 'join'
+  // registration regardless of what's selected here (see registerUser in
+  // worker/db.ts), so defaulting to 'admin' in that case only confused
+  // people into thinking they had a choice. Creating a brand-new circle
+  // still defaults to 'admin', since that's genuinely how it works.
+  const [role, setRole] = useState<UserRole>(defaultInviteCode ? 'member' : 'admin');
   const [action, setAction] = useState<'create' | 'join'>(defaultInviteCode ? 'join' : 'create');
   const [groupName, setGroupName] = useState('');
   const [groupCategory, setGroupCategory] = useState<GroupCategory>('family');
@@ -356,50 +362,59 @@ export const UserRegistrationModal: React.FC<Props> = ({
             />
           </div>
 
-          {/* Role Selection */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Your Role</label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setRole('admin')}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer text-left ${
-                  role === 'admin'
-                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
-                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
-                <div>
-                  <div className="font-bold">Circle Admin</div>
-                  <div className="text-[10px] text-slate-400">Can create & manage circle</div>
-                </div>
-              </button>
+          {/* Role Selection — only meaningful when creating a brand-new
+              circle. Joining an existing one always makes you a Member
+              (the server enforces this regardless of any role sent here),
+              so the choice is hidden in that mode to avoid implying
+              there's a decision to make. */}
+          {action === 'create' && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Your Role</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRole('admin')}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer text-left ${
+                    role === 'admin'
+                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
+                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
+                  <div>
+                    <div className="font-bold">Circle Admin</div>
+                    <div className="text-[10px] text-slate-400">Can create & manage circle</div>
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setRole('member')}
-                className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer text-left ${
-                  role === 'member'
-                    ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
-                    : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Users className="w-4 h-4 shrink-0 text-cyan-400" />
-                <div>
-                  <div className="font-bold">Member</div>
-                  <div className="text-[10px] text-slate-400">Shares location with consent</div>
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('member')}
+                  className={`flex items-center gap-2 p-3 rounded-xl border text-xs font-semibold transition cursor-pointer text-left ${
+                    role === 'member'
+                      ? 'bg-emerald-500/15 border-emerald-500 text-emerald-300'
+                      : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Users className="w-4 h-4 shrink-0 text-cyan-400" />
+                  <div>
+                    <div className="font-bold">Member</div>
+                    <div className="text-[10px] text-slate-400">Shares location with consent</div>
+                  </div>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Action Tabs: Create Circle vs Join Circle */}
           <div className="pt-2 border-t border-slate-800">
             <div className="flex rounded-xl bg-slate-800/80 p-1 mb-3">
               <button
                 type="button"
-                onClick={() => setAction('create')}
+                onClick={() => {
+                  setAction('create');
+                  setRole('admin');
+                }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg transition ${
                   action === 'create' ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
@@ -409,7 +424,10 @@ export const UserRegistrationModal: React.FC<Props> = ({
               </button>
               <button
                 type="button"
-                onClick={() => setAction('join')}
+                onClick={() => {
+                  setAction('join');
+                  setRole('member');
+                }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-lg transition ${
                   action === 'join' ? 'bg-emerald-500 text-white shadow-xs' : 'text-slate-400 hover:text-white'
                 }`}
@@ -450,17 +468,23 @@ export const UserRegistrationModal: React.FC<Props> = ({
                 </div>
               </div>
             ) : (
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Invite Code <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. SAFE-8492"
-                  className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white uppercase tracking-wider font-mono placeholder-slate-500 text-sm focus:outline-hidden focus:border-emerald-500"
-                />
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Invite Code <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. SAFE-8492"
+                    className="w-full px-3.5 py-2.5 bg-slate-800/80 border border-slate-700 rounded-xl text-white uppercase tracking-wider font-mono placeholder-slate-500 text-sm focus:outline-hidden focus:border-emerald-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-cyan-300 bg-cyan-500/10 border border-cyan-500/20 rounded-xl px-3 py-2">
+                  <Users className="w-3.5 h-3.5 shrink-0 text-cyan-400" />
+                  <span>You'll join this circle as a <strong>Member</strong>.</span>
+                </div>
               </div>
             )}
           </div>
